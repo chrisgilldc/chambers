@@ -25,14 +25,6 @@ class Senate(Chamber):
         super().__init__("Senate", parent_logger, log_level)
 
         self._convene_dt = None # Stores the information from the floor activity JSON
-        self._convened_at = None
-        self._convenes_at = None
-        self._will_convene_at = None
-        self._adjourned_at = None
-
-        self._load_timestamp = 0 # When we last loaded the file from the site.
-
-        self.update()
 
     @property
     def adjourned_at(self):
@@ -76,30 +68,37 @@ class Senate(Chamber):
 
     def update(self, force=False):
         """
-        Update any internal timers.
+        Update the Senate. Load if necessary.
 
         :return:
         """
-        self._convene_dt = self._load()
-        self._load_timestamp = datetime.now(timezone.utc).timestamp()
-
-        if self._convene_dt < datetime.now(self._dctz):
-            convened = True
-            self._convened_at = datetime.now(self._dctz)
-            self._convenes_at = None
-            self._adjourned_at = None
-        elif self._convene_dt > datetime.now(self._dctz):
-            convened = False
-            self._convenes_at = self._convene_dt
-            self._convened_at = None
+        if force:
+            # Always load if we're forced, or if we don't have any data yet.
+            self._logger.info("Force load requested.")
+            self._load()
+            return True
+        elif datetime.now(timezone.utc) > self.next_update:
+            self._load()
+            return True
         else:
-            raise ValueError("Convened is in an impossible state.")
-
-        # Track when we adjourn, since the JSON doesn't provide this.
-        if not convened and self._convened:
-            self._adjourned_at = datetime.now(self._dctz)
-
-        self._convened = convened
+            return False
+        #     since_update = ( datetime.now(self._dctz) - self._updated ).seconds
+        #     self._logger.debug(f"Time since last update {since_update}s")
+        #     if not self.convened:
+        #         if self.convenes_at is not None:
+        #             # If we're within 10 minutes of the convening time, update once a minute.
+        #             if (self.convenes_at - timedelta(minutes=10) ) < datetime.now(timezone.utc) and since_update > 60:
+        #                 self._load()
+        #                 return True
+        #         else:
+        #             if since_update > 600:
+        #                 self._load()
+        #                 return True
+        #     else:
+        #         if since_update > 120:
+        #             self._load()
+        #             return True
+        # return False
 
     def _load(self):
         """
@@ -117,4 +116,22 @@ class Senate(Chamber):
                 int(senate_data['floorProceedings'][0]['conveneMinutes']),
                 tzinfo=zoneinfo.ZoneInfo('America/New_York')
         )
-        return convene_dt
+
+        if convene_dt < datetime.now(self._dctz):
+            convened = True
+            self._convened_at = datetime.now(self._dctz)
+            self._convenes_at = None
+            self._adjourned_at = None
+        elif convene_dt > datetime.now(self._dctz):
+            convened = False
+            self._convenes_at = convene_dt
+            self._convened_at = None
+        else:
+            raise ValueError("Convened is in an impossible state.")
+
+        # Track when we adjourn, since the JSON doesn't provide this.
+        if not convened and self._convened:
+            self._adjourned_at = datetime.now(self._dctz)
+
+        self._updated = datetime.now(self._dctz).replace(microsecond=0)
+        self._convened = convened
