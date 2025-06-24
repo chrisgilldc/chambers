@@ -28,12 +28,10 @@ class House(Chamber):
         """
         Base chamber object.
         :param parent_logger: Parent logger, if any.
+        :type parent_logger: logging.Logger
         :param log_level: Log level.
         """
         super().__init__("House", parent_logger, log_level)
-        self._updated = datetime(1900, 1, 1, 0, 0, 0, tzinfo=self._dctz)
-
-        self.load()
 
     def update(self, force=False):
         """
@@ -45,23 +43,37 @@ class House(Chamber):
         :return: datetime
         """
 
-        if force or len(self._events) == 0:
+        if force:
             # Always load if we're forced, or if we don't have any data yet.
-            self.load()
+            self._logger.info("Force load set, updating.")
+            self._load()
+            return True
+        elif len(self._events) == 0:
+            self._logger.info("No events available at update. Loading.")
+            self._load()
+            return True
+        elif datetime.now(timezone.utc) > self.next_update:
+            self._logger.info("Update time has passed. Loading.")
+            self._load()
+            return True
         else:
-            since_update = ( datetime.now(self._dctz) - self._updated ).seconds
-            if not self.convened:
-                if self.convenes_at is not None:
-                    # If we're within 10 minutes of the convening time, update once a minute.
-                    if (self.convenes_at - timedelta(minutes=10) ) < datetime.now(timezone.utc) and since_update > 60:
-                        self.load()
-                else:
-                    if since_update > 600:
-                        self.load()
-            else:
-                if since_update > 120:
-                    self.load()
-
+            return False
+        #     since_update = ( datetime.now(self._dctz) - self._updated ).seconds
+        #     if not self.convened:
+        #         if self.convenes_at is not None:
+        #             # If we're within 10 minutes of the convening time, update once a minute.
+        #             if (self.convenes_at - timedelta(minutes=10) ) < datetime.now(timezone.utc) and since_update > 60:
+        #                 self._load()
+        #                 return True
+        #         else:
+        #             if since_update > 600:
+        #                 self._load()
+        #                 return True
+        #     else:
+        #         if since_update > 120:
+        #             self._load()
+        #             return True
+        # return False
 
     @property
     def activity(self, timestamp=None):
@@ -146,7 +158,7 @@ class House(Chamber):
         else:
             return None
 
-    def load(self):
+    def _load(self):
         """
         Load current House activity.
         """
@@ -303,6 +315,9 @@ class House(Chamber):
                     elif 'The Speaker announced that the House do now recess. The next meeting is subject to the call of the Chair.' == event['description']:
                         self._logger.info("Event {} - Recess to call of chair.".format(floor_action.get("act-id")))
                         event['type'] = chambers.const.RECESS_COC
+                    elif 'The Speaker announced that the House do now recess for a period of less than 15 minutes.':
+                        self._logger.info("Event {} - Recess for less than 15m".format(floor_action.get("act-id")))
+                        event['type'] = chambers.const.RECESS_15M
                 elif event['act-id'] == 'H8D000':
                     if 'MORNING-HOUR DEBATE' in event['description']:
                         event['type'] = chambers.const.MORNING_DEBATE
