@@ -2,6 +2,7 @@
 Chamber base class.
 """
 
+from datetime import datetime, timedelta, timezone
 import logging
 import zoneinfo
 from zoneinfo import ZoneInfo
@@ -36,8 +37,15 @@ class Chamber:
         # Initialize variables.
         self._events = [] # Event log.
         self._convened = None
+        self._convened_at = None
+        self._convenes_at = None
+        self._will_convene_at = None
+        self._adjourned_at = None
+
         # Base DC timezone, since we need this a lot.
         self._dctz = zoneinfo.ZoneInfo('America/New_York')
+        # Initialize updated as an arbitrarily old date.
+        self._updated = datetime(1900, 1, 1, 0, 0, 0, tzinfo=self._dctz)
 
     @property
     def activity(self):
@@ -105,6 +113,26 @@ class Chamber:
         """
         raise NotImplemented("Must be implemented by a specific base class.")
 
+    @property
+    def next_update(self):
+        """
+        When the next update is scheduled.
+        :return: float or datetime
+        """
+
+        if self.convened:
+            return self._updated + timedelta(minutes=2)
+        else:
+            # If we know when the chamber next convenes, the next check should be ten minutes before that.
+            if self.convenes_at is not None:
+                preconvene_target = self.convenes_at - timedelta(minutes=10)
+                if preconvene_target < datetime.now(timezone.utc):
+                    return self._updated + timedelta(seconds=60)
+                else:
+                    return preconvene_target
+            else:
+                return self._updated + timedelta(minutes=10)
+
     def update(self, force=False):
         """
         Perform an update of data sources.
@@ -113,4 +141,13 @@ class Chamber:
         :type force: bool
         :return: datetime
         """
+        raise NotImplemented("Must be implemented by a specific base class.")
+
+    def _load(self):
+        """
+        Chamber internal load method. Fetches from source(es) and produces correct data.
+
+        :return: None
+        """
+
         raise NotImplemented("Must be implemented by a specific base class.")
