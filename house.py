@@ -24,7 +24,7 @@ class House(Chamber):
         'recess',
         'morning-hour')
 
-    def __init__(self, parent_logger=None, log_level= logging.INFO):
+    def __init__(self, parent_logger=None, log_level=logging.INFO):
         """
         Base chamber object.
         :param parent_logger: Parent logger, if any.
@@ -168,9 +168,10 @@ class House(Chamber):
         if today_response.ok:
             self._logger.info("Loading today's House floor proceedings.")
             # Response is okay, process it.
-            self._load_xml(today_response.content)
+            event_count = self._load_xml(today_response.content)
+            self._logger.info(f"Today's proceedings resulted in {event_count} events.")
 
-        # Load previous day's
+        # Load previous day
         i = 1
         found_response = False
         while not found_response:
@@ -180,20 +181,36 @@ class House(Chamber):
                     (datetime.now() - timedelta(days=i)).strftime('%d %b %Y')
                 ))
                 # pprint(old_response.content)
-                self._load_xml(old_response.content)
+                if today_response.ok:
+                    self._logger.info("Loading to extract adjournment.")
+                    # Load the previous legislative days' XML only to get the adjournment data.
+                    event_count = self._load_xml(old_response.content, only_eod=True)
+                    if event_count != 1:
+                        self._logger.error("Could not load adjournment from journal on {}".format(
+                            (datetime.now() - timedelta(days=i)).strftime('%d %b %Y')))
+                    else:
+                        self._logger.info("Loaded adjournment from journal.")
+                else:
+                    event_count = self._load_xml(old_response.content)
+                    self._logger.info("Loaded {} events from journal on {}".format(event_count,(datetime.now()
+                            - timedelta(days=i)).strftime('%d %b %Y') ))
                 found_response = True
             i += 1
+        self._logger.info("Sorting events.")
         self._sort_events()
         # self._trim_event_log()
         self._updated = datetime.now(self._dctz)
+        self._logger.info("Load complete.")
 
-    def _load_xml(self, house_xml):
+    def _load_xml(self, house_xml, only_eod=False):
         """
         Load a single XML file.
 
 
         :param house_xml: The XML file from the House Floor site.
         :type house_xml: str
+        :param only_eod: Only find the end of legislative day record from the XML file, if any.
+        :type only_eod: bool
         :return: Number of items added or replaced.
         :rtype: int
         """
@@ -209,7 +226,9 @@ class House(Chamber):
             if floor_action.tag == 'legislative_day_finished':
                 if self._add_end_day(floor_action):
                     items += 1
-            elif floor_action.tag == 'floor_action':
+                    if only_eod:
+                        return items # Can return here, since by definition there's only one end of day.
+            elif floor_action.tag == 'floor_action' and not only_eod:
                 # Breaking this out to make logging for debugging more details.
                 if floor_action.attrib['act-id'] == "H20100":
                     self._logger.debug("Floor Action has id H20100 (Convene). Will add.".format(floor_action.attrib['act-id']))
@@ -225,6 +244,7 @@ class House(Chamber):
                         items += 1
                 else:
                     self._logger.debug("Floor Action has had {}. Skipping.".format(floor_action.attrib['act-id']))
+            self._logger.info("Processed all floor actions.")
         return items
 
     def _add_end_day(self, end_day):
@@ -327,9 +347,11 @@ class House(Chamber):
                     else:
                         event['type'] = chambers.const.OTHER
                 elif event['act-id'] == 'H37100':
+                    self._logger.info("Event {} - Recorded Vote".format(floor_action.get("act-id")))
                     event['type'] = chambers.const.VOTE_RECORDED
                     event['action_item'] = floor_action.find('action_item').text
                 elif event['act_id'] == 'H35000':
+                    self._logger.info("Event {} - Voice Vote".format(floor_action.get("act-id")))
                     event['type'] = chambers.const.VOTE_VOICE
                     event['action_item'] = floor_action.find('action_item').text
                 # Add to the event log.
