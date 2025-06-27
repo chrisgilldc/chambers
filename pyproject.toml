@@ -28,7 +28,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.version]
-path = "chamber/version.py"
+path = "chambers/version.py"
 
 [project.scripts]
 chambers = "chambers.daemon"
