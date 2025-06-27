@@ -8,9 +8,9 @@ description = "Chamber - Current Congressional Status"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "feedparser",
-    'tzdata',
-    'paho-mqtt'
+    'paho-mqtt',
+    'requests',
+    'tzdata'
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
