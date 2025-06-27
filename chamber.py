@@ -2,8 +2,10 @@
 Chamber base class.
 """
 
+import chambers.const
 from datetime import datetime, timedelta, timezone
 import logging
+from operator import itemgetter
 import zoneinfo
 from zoneinfo import ZoneInfo
 
@@ -56,6 +58,16 @@ class Chamber:
         """
         raise NotImplemented("Must be implemented by a specific base class.")
 
+    # @property
+    # def adjourned_at(self):
+    #     """
+    #     When the chamber adjourned. Returns datetime if adjourned, None if in session.
+    #
+    #     :return: datetime or None
+    #     """
+    #
+    #     raise NotImplemented("Must be implemented by a specific base class.")
+
     @property
     def adjourned_at(self):
         """
@@ -64,7 +76,14 @@ class Chamber:
         :return: datetime or None
         """
 
-        raise NotImplemented("Must be implemented by a specific base class.")
+        latest_convene = self._search_events(types=chambers.const.CONVENE)
+        latest_adjourn = self._search_events(types=chambers.const.ADJOURN)
+        if latest_adjourn is None:
+            return None
+        elif latest_adjourn['timestamp'] > latest_convene['timestamp']:
+            return latest_adjourn['timestamp']
+        else:
+            return None
 
     @property
     def convened(self):
@@ -84,8 +103,11 @@ class Chamber:
 
         :return: datetime or None
         """
-
-        raise NotImplemented("Must be implemented by a specific base class.")
+        if self.convened:
+            latest_convene = self._search_events(types=chambers.const.CONVENE)
+            return latest_convene['timestamp']
+        else:
+            return None
 
     @property
     def convenes_at(self):
@@ -95,7 +117,32 @@ class Chamber:
         :return: datetime or None
         """
 
-        raise NotImplemented("Must be implemented by a specific base class.")
+        next_convene = self._search_events(search_forward=True, types=chambers.const.CONVENE_SCHEDULED)
+        if next_convene is not None:
+            return next_convene['timestamp']
+        else:
+            return None
+
+    # @property
+    # def convened_at(self):
+    #     """
+    #     When the chamber convened for its main session. Does *not* consider Recesses. Will return Datetime if convened,
+    #     None if adjourned.
+    #
+    #     :return: datetime or None
+    #     """
+    #
+    #     raise NotImplemented("Must be implemented by a specific base class.")
+    #
+    # @property
+    # def convenes_at(self):
+    #     """
+    #     When the chamber will convene next. Returns a datetime if adjourned and a reconvening is set, None otherwise.
+    #
+    #     :return: datetime or None
+    #     """
+    #
+    #     raise NotImplemented("Must be implemented by a specific base class.")
 
     @property
     def latest(self):
@@ -151,3 +198,81 @@ class Chamber:
         """
 
         raise NotImplemented("Must be implemented by a specific base class.")
+
+    def _search_events(self, timestamp=None, search_forward=False, types=None):
+        """
+        Search for events based on critera.
+
+        :param timestamp: Timestamp to use as a reference. Defaults to now.
+        :param timestamp: datetime or None
+        :param search_forward: Search for future events if set. By default, will only search for past events.
+        :type search_forward: bool
+        :param types: Types of events to include. If not specified, will search all.
+        :type types: list or int
+        :return:
+        """
+        # self._logger.debug("Available events: {}".format(self._events))
+        # self._logger.debug("Timestamp: {}".format(timestamp))
+        # self._logger.debug("Search Forward: {}".format(search_forward))
+        # self._logger.debug("Types: {}".format(types))
+
+        selected_event = None
+        # Input checking.
+        if isinstance(timestamp, datetime):
+            target_dt = timestamp
+        else:
+            target_dt = datetime.now(timezone.utc)
+
+        if types is None:
+            types = chambers.const.ALL_EVENTS
+        elif type(types) in (str, int):
+            # If a string, make it a list of one.
+            types = [types]
+
+        for event in self._events:
+            # print("Checking event: {}".format(event))
+            try:
+                if event['type'] in types:
+                    if search_forward and event['timestamp'] >= target_dt:
+                        if selected_event is None:
+                            selected_event = event
+                        elif event['timestamp'] < selected_event['timestamp']:
+                            selected_event = event
+                    elif not search_forward and event['timestamp'] <= target_dt:
+                        if selected_event is None:
+                            selected_event = event
+                        elif event['timestamp'] > selected_event['timestamp']:
+                            selected_event = event
+            except KeyError:
+                self._logger.warning("Event {} does not have type setting.".format(event['id']))
+                self._logger.warning("Event dump - {}".format(event))
+        return selected_event
+
+    def _sort_events(self):
+        """
+        Sort the list of events by timestamp.
+
+        :return:
+        """
+        self._events = sorted(self._events, key=itemgetter('timestamp'), reverse=True)
+
+    def _trim_event_log(self):
+        """
+        Trim the event log.
+
+        :return:
+        """
+        delete_targets = []
+        limit = datetime.now(timezone.utc) - timedelta(days=1)
+        limit = limit.replace(hour=0,minute=0,second=0,microsecond=0)
+        self._logger.info("Considering all events older than {}".format(limit))
+        i = 0
+        while i < len(self._events):
+            if self._events[i]['timestamp'] < limit:
+                delete_targets.append(i)
+            i += 1
+
+        self._logger.info("Will remove {} events.".format(len(delete_targets)))
+        for item in sorted(delete_targets, reverse=True):
+            if item > 2:
+                self._events.pop(item)
