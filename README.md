@@ -31,13 +31,13 @@
 <br />
 <div align="center">
   <a href="https://github.com/github_username/repo_name">
-    <img src="images/logo.png" alt="Logo" width="80" height="80">
+    <img src="images/Seal_of_the_United_States_Congress.svg" alt="Logo" width="80" height="80">
   </a>
 
-<h3 align="center">project_title</h3>
+<h3 align="center">Chambers</h3>
 
   <p align="center">
-    project_description
+    Current status of the U.S. Congress
     <br />
     <a href="https://github.com/github_username/repo_name"><strong>Explore the docs »</strong></a>
     <br />
@@ -208,7 +208,7 @@ Distributed under the project_license. See `LICENSE.txt` for more information.
 
 Your Name - [@twitter_handle](https://twitter.com/twitter_handle) - email@email_client.com
 
-Project Link: [https://github.com/github_username/repo_name](https://github.com/github_username/repo_name)
+Project Link: [https://github.com/chrisgilldc/chambers](https://github.com/chrisgilldc/chambers)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
