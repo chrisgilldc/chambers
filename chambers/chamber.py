@@ -87,15 +87,39 @@ class Chamber:
         else:
             return None
 
+
     @property
     def convened(self):
         """
-        Is this chamber currently convened. This is determined based on the best information available.
-        Returns None if chamber state is unknown.
-
-        :return: bool or None
+        Is the House convened?
+        :return:
         """
-        raise NotImplemented("Must be implemented by a specific base class.")
+
+        latest_convene = self._search_events(types=chambers.const.CONVENE)
+        latest_adjourn = self._search_events(types=chambers.const.ADJOURN)
+        if latest_adjourn is None and latest_convene is None:
+            return "Unknown"
+        elif latest_adjourn is not None and latest_convene is None:
+            # If we have an adjourn record but not a convene record.
+            return False
+        elif latest_adjourn is None and latest_convene['timestamp'] is not None:
+            return True
+        elif latest_adjourn['timestamp'] < latest_convene['timestamp']:
+            return True
+        else:
+            return False
+
+
+
+    # @property
+    # def convened(self):
+    #     """
+    #     Is this chamber currently convened. This is determined based on the best information available.
+    #     Returns None if chamber state is unknown.
+    #
+    #     :return: bool or None
+    #     """
+    #     raise NotImplemented("Must be implemented by a specific base class.")
 
     @property
     def convened_at(self):
@@ -170,7 +194,7 @@ class Chamber:
         """
 
         if self.convened:
-            return self._updated + timedelta(minutes=2)
+            return (self._updated + timedelta(minutes=2)).replace(second=0, microsecond=0)
         else:
             # If we know when the chamber next convenes, the next check should be ten minutes before that.
             if self.convenes_at is not None:

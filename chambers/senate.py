@@ -44,35 +44,35 @@ class Senate(Chamber):
     #
     #     return self._adjourned_at
 
-    @property
-    def convened(self):
-        """
-        Is the Senate convened?
-        :return:
-        """
-        return self._convened
-
-
-    @property
-    def convened_at(self):
-        """
-        When the Senate convened for its main session. Does *not* consider Recesses. Will return Datetime if convened,
-        None if adjourned.
-
-        :return: datetime or None
-        """
-
-        return self._convened_at
-
-    @property
-    def convenes_at(self):
-        """
-        When the Senate will convene next. Returns a datetime if adjourned and a reconvening is set, None otherwise.
-
-        :return: datetime or None
-        """
-
-        return self._convenes_at
+    # @property
+    # def convened(self):
+    #     """
+    #     Is the Senate convened?
+    #     :return:
+    #     """
+    #     return self._convened
+    #
+    #
+    # @property
+    # def convened_at(self):
+    #     """
+    #     When the Senate convened for its main session. Does *not* consider Recesses. Will return Datetime if convened,
+    #     None if adjourned.
+    #
+    #     :return: datetime or None
+    #     """
+    #
+    #     return self._convened_at
+    #
+    # @property
+    # def convenes_at(self):
+    #     """
+    #     When the Senate will convene next. Returns a datetime if adjourned and a reconvening is set, None otherwise.
+    #
+    #     :return: datetime or None
+    #     """
+    #
+    #     return self._convenes_at
 
     def update(self, force=False):
         """

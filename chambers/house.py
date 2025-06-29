@@ -99,26 +99,7 @@ class House(Chamber):
         return selected_event
 
 
-
-    @property
-    def convened(self):
-        """
-        Is the House convened?
-        :return:
-        """
-
-        latest_convene = self._search_events(types=chambers.const.CONVENE)
-        latest_adjourn = self._search_events(types=chambers.const.ADJOURN)
-        if latest_adjourn is not None and latest_convene is None:
-            # If we have an adjourn record but not a convene record.
-            return False
-        elif latest_adjourn is None and latest_convene['timestamp'] is not None:
-            return True
-        elif latest_adjourn['timestamp'] < latest_convene['timestamp']:
-            return True
-        else:
-            return False
-
+    # @property
     # @property
     # def convened_at(self):
     #     """

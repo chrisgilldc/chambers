@@ -213,6 +213,11 @@ class ChamberWatcher:
                 self._pub_message(self._topics['senate_convenes_at'], self._senate.convenes_at)
                 self._logger.info("Senate next update: {} ({})".format(self._senate.next_update, type(self._senate.next_update)))
                 self._pub_message(self._topics['senate_next_update'], self._senate.next_update)
+        self._logger.debug("Run loop exited")
+
+    @property
+    def __class__(self):
+        return super().__class__
 
     # System Signal Handling
     def _register_signal_handlers(self):
@@ -282,6 +287,8 @@ class ChamberWatcher:
         except ConnectionError as error:
             self._logger.error(f"Could not connect to MQTT broker: {error}")
             sys.exit(1)
+        else:
+            self._logger.info("Connection started. Awaiting broker acknowledgement.")
 
     def _send_online(self):
         """
