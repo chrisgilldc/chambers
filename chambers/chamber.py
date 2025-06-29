@@ -80,6 +80,8 @@ class Chamber:
         latest_adjourn = self._search_events(types=chambers.const.ADJOURN)
         if latest_adjourn is None:
             return None
+        elif latest_adjourn['timestamp'] is not None and latest_convene is None:
+            return latest_adjourn['timestamp']
         elif latest_adjourn['timestamp'] > latest_convene['timestamp']:
             return latest_adjourn['timestamp']
         else:
