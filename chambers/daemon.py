@@ -414,7 +414,8 @@ class ChamberWatcher:
         )
         return return_data
 
-if __name__ == "__main__":
+def chambers_cli():
+
     # If run as main, try to get everything from the environmemnt and run.
 
     MQTT_HOST = os.getenv("MQTT_HOST")
@@ -448,3 +449,6 @@ if __name__ == "__main__":
         log_level=LOGVAL
     )
     cw.run()
+
+if __name__ == "__main__":
+    sys.exit(chambers_cli())

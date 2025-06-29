@@ -31,4 +31,4 @@ build-backend = "hatchling.build"
 path = "chambers/version.py"
 
 [project.scripts]
-chambers = "chambers.daemon:ChamberWatcher"
+chambers = "chambers.daemon:chambers_cli"
