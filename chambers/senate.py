@@ -220,7 +220,7 @@ class Senate(Chamber):
         # Replace any embedded CRs. This makes the regular expression easier.
         intro_text = intro_text.replace('\n','')
         self._logger.debug("Intro text found: {}".format(intro_text))
-        convene_time_search = re.search("to order at\\s*(\\d{1,2}:?\\d{0,2}) ([a|p].?m.?)", intro_text)
+        convene_time_search = re.search("to order at\\s*(\\d{1,2}:?\\d{0,2}) ([a|p]\.?m\.?)", intro_text)
 
         if len(convene_time_search.groups()) == 2:
             # Make the timestamp.
@@ -262,7 +262,8 @@ class Senate(Chamber):
             self._logger.debug("Depart text is: {}".format(depart_string))
             # Pull out the adjournment information.
             #aa_string = re.search("at(?:\\s*)(\\d{1,2}:\\d{1,2}) ([a|p].?m.?)", depart_string)
-            aa_string = re.search("at\\s*(\\d{1,2}:\\d{1,2}) ([a|p].?m.?)", depart_string)
+            aa_string = re.search("at\\s*(\\d{1,2}:\\d{1,2}) ([a|p]\.?m\.?)", depart_string)
+            self._logger.debug("Extracted data for departure - Time '{}', am/pm '{}'".format(aa_string.group(1), aa_string.group(2)))
             ampm = aa_string.group(2).replace('.','')
             aa_string = aa_string.group(1) + " " + ampm
             depart_at = datetime.combine(base_date, datetime.strptime(aa_string, "%I:%M %p").time()).replace(
@@ -283,7 +284,7 @@ class Senate(Chamber):
             convening_text = depart_string[until_pos.span()[0]:]
             self._logger.debug(f"Convene text is: {convening_text}")
             #ct_string = re.search("until(?:\\s*)(\\d{1,2}:?\\d{0,2}) ([a|p].?m.?)", convening_text)
-            ct_string = re.search("until\\s*(\\d{1,2}:?\\d{0,2}) ([a|p].?m.?)", convening_text)
+            ct_string = re.search("until\\s*(\\d{1,2}:?\\d{0,2}) ([a|p]\.?m\.?)", convening_text)
             ampm = ct_string.group(2).replace('.','')
             if ":" in ct_string.group(1):
                 ct_string = ct_string.group(1) + " " + ampm
