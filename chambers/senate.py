@@ -210,8 +210,13 @@ class Senate(Chamber):
         self._logger.debug(f"Extracted base date {base_date}")
 
         # Parse the Intro Text for a convening *time*
-        # Search and pull out the text. This should *always* exist.
-        intro_text = senate_tree.find("intro_text").text
+        # Search and pull out the text. This has information about convening.
+        try:
+            intro_text = senate_tree.find("intro_text").text
+        except AttributeError:
+            self._logger.info("File has no 'intro_text', nothing usable here.")
+            return 0
+
         # Replace any embedded CRs. This makes the regular expression easier.
         intro_text = intro_text.replace('\n','')
         self._logger.debug("Intro text found: {}".format(intro_text))
