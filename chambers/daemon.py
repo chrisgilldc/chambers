@@ -440,9 +440,11 @@ def chambers_cli():
         print(f"Requested logging level {LOGLEVEL} is not valid. Defaulting to 'WARNING'")
         LOGVAL = logging.getLevelName('INFO')
 
-    # print(f"Using Environment values:\nHOST: {MQTT_HOST}\nPORT: {MQTT_PORT}\nUSERNAME: {MQTT_USERNAME}\n"
-    #       f"PASSWORD: {MQTT_PASSWORD}\nQOS: {MQTT_QOS}\nClient ID: {MQTT_CLIENTID}\nBase: {MQTT_BASE}\n"
-    #       f"HA Base: {MQTT_HABASE}\nLog Level: {LOGLEVEL} ({LOGVAL})")
+
+    if LOGVAL == logging.DEBUG:
+        print(f"Using Environment values:\nHOST: {MQTT_HOST}\nPORT: {MQTT_PORT}\nUSERNAME: {MQTT_USERNAME}\n"
+               f"PASSWORD: {MQTT_PASSWORD}\nQOS: {MQTT_QOS}\nClient ID: {MQTT_CLIENTID}\nBase: {MQTT_BASE}\n"
+               f"HA Base: {MQTT_HABASE}\nLog Level: {LOGLEVEL} ({LOGVAL})")
 
     cw = ChamberWatcher(
         mqtt_host=MQTT_HOST,
