@@ -261,7 +261,6 @@ class Senate(Chamber):
             depart_string = depart_string.text.replace("\n", "")
             self._logger.debug("Depart text is: {}".format(depart_string))
             # Pull out the adjournment information.
-            #aa_string = re.search("at(?:\\s*)(\\d{1,2}:\\d{1,2}) ([a|p].?m.?)", depart_string)
             aa_string = re.search("at\\s*(\\d{1,2}:\\d{1,2}) ([a|p]\\.?m\\.?)", depart_string)
             self._logger.debug("Extracted data for departure - Time '{}', am/pm '{}'".format(aa_string.group(1), aa_string.group(2)))
             ampm = aa_string.group(2).replace('.','')
@@ -285,11 +284,15 @@ class Senate(Chamber):
             self._logger.debug(f"Convene text is: {convening_text}")
             #ct_string = re.search("until(?:\\s*)(\\d{1,2}:?\\d{0,2}) ([a|p].?m.?)", convening_text)
             ct_string = re.search("until\\s*(\\d{1,2}:?\\d{0,2}) ([a|p]\\.?m\\.?)", convening_text)
-            ampm = ct_string.group(2).replace('.','')
-            if ":" in ct_string.group(1):
-                ct_string = ct_string.group(1) + " " + ampm
+            if ct_string is None:
+                if 'noon' in convening_text:
+                    ct_string = "12:00 pm"
             else:
-                ct_string = ct_string.group(1) + ":00 " + ampm
+                ampm = ct_string.group(2).replace('.','')
+                if ":" in ct_string.group(1):
+                    ct_string = ct_string.group(1) + " " + ampm
+                else:
+                    ct_string = ct_string.group(1) + ":00 " + ampm
             convene_time = datetime.strptime(ct_string, "%I:%M %p").time().replace(tzinfo=self._dctz)
             # Does this reference tomorrow?
             if "tomorrow" in convening_text:
