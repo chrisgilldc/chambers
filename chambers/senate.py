@@ -175,7 +175,7 @@ class Senate(Chamber):
             event_type = chambers.const.CONVENE
         elif convene_dt > datetime.now(self._dctz):
             convened = False
-            event_type = chambers.const.CONVENE_SCHEDULED,
+            event_type = chambers.const.CONVENE_SCHEDULED
         else:
             raise ValueError("Convened is in an impossible state.")
 
@@ -293,7 +293,9 @@ class Senate(Chamber):
                     ct_string = ct_string.group(1) + " " + ampm
                 else:
                     ct_string = ct_string.group(1) + ":00 " + ampm
+            self._logger.debug(f"Senate convene time string is '{ct_string}'")
             convene_time = datetime.strptime(ct_string, "%I:%M %p").time().replace(tzinfo=self._dctz)
+            self._logger.debug(f"Senate convene time datetime is '{convene_time}'")
             # Does this reference tomorrow?
             if "tomorrow" in convening_text:
                 convenes_at = datetime.combine((base_date + timedelta(days=1)).date(), convene_time)
