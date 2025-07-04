@@ -195,25 +195,24 @@ class ChamberWatcher:
             if self._mqtt_status == 'disconnected':
                 self.connect()
             elif self._mqtt_status in ('connecting','disconnected-planned'):
-                return
-
-            # Update the House.
-            if self._house.update():
-                self._pub_message(self._topics['house_convened'], self._house.convened)
-                self._pub_message(self._topics['house_adjourned_at'], self._house.adjourned_at)
-                self._pub_message(self._topics['house_convened_at'], self._house.convened_at)
-                self._pub_message(self._topics['house_convenes_at'], self._house.convenes_at)
-                self._logger.info("House next update: {} ({})".format(self._house.next_update, type(self._house.next_update)))
-                self._pub_message(self._topics['house_next_update'], self._house.next_update)
-            # Update the Senate.
-            if self._senate.update():
-                self._pub_message(self._topics['senate_convened'], self._senate.convened)
-                self._pub_message(self._topics['senate_adjourned_at'], self._senate.adjourned_at)
-                self._pub_message(self._topics['senate_convened_at'], self._senate.convened_at)
-                self._pub_message(self._topics['senate_convenes_at'], self._senate.convenes_at)
-                self._logger.info("Senate next update: {} ({})".format(self._senate.next_update, type(self._senate.next_update)))
-                self._pub_message(self._topics['senate_next_update'], self._senate.next_update)
-        self._logger.debug("Run loop exited")
+                pass
+            else:
+                # Update the House.
+                if self._house.update():
+                    self._pub_message(self._topics['house_convened'], self._house.convened)
+                    self._pub_message(self._topics['house_adjourned_at'], self._house.adjourned_at)
+                    self._pub_message(self._topics['house_convened_at'], self._house.convened_at)
+                    self._pub_message(self._topics['house_convenes_at'], self._house.convenes_at)
+                    self._logger.info("House next update: {} ({})".format(self._house.next_update, type(self._house.next_update)))
+                    self._pub_message(self._topics['house_next_update'], self._house.next_update)
+                # Update the Senate.
+                if self._senate.update():
+                    self._pub_message(self._topics['senate_convened'], self._senate.convened)
+                    self._pub_message(self._topics['senate_adjourned_at'], self._senate.adjourned_at)
+                    self._pub_message(self._topics['senate_convened_at'], self._senate.convened_at)
+                    self._pub_message(self._topics['senate_convenes_at'], self._senate.convenes_at)
+                    self._logger.info("Senate next update: {} ({})".format(self._senate.next_update, type(self._senate.next_update)))
+                    self._pub_message(self._topics['senate_next_update'], self._senate.next_update)
 
     @property
     def __class__(self):
