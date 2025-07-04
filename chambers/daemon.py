@@ -440,6 +440,11 @@ def chambers_cli():
         print(f"Requested logging level {LOGLEVEL} is not valid. Defaulting to 'WARNING'")
         LOGVAL = logging.getLevelName('INFO')
 
+    try:
+        MQTT_PORT = int(MQTT_PORT)
+    except ValueError:
+        print(f"MQTT_PORT must be an integer number!")
+        sys.exit(1)
 
     print(f"Using Environment values:\nHOST: {MQTT_HOST}\nPORT: {MQTT_PORT}\nUSERNAME: {MQTT_USERNAME}\n"
            f"PASSWORD: {MQTT_PASSWORD}\nQOS: {MQTT_QOS}\nClient ID: {MQTT_CLIENTID}\nBase: {MQTT_BASE}\n"
