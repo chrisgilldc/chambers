@@ -216,97 +216,30 @@ class Senate(Chamber):
         except AttributeError:
             self._logger.info("File has no 'intro_text', nothing usable here.")
             return 0
-
-        # Replace any embedded CRs. This makes the regular expression easier.
-        intro_text = intro_text.replace('\n','')
-        self._logger.debug("Intro text found: {}".format(intro_text))
-        convene_time_search = re.search("to order at\\s*(\\d{1,2}:?\\d{0,2}) ([a|p]\\.?m\\.?)", intro_text)
-
-        if len(convene_time_search.groups()) == 2:
-            # Make the timestamp.
-            ampm = convene_time_search.group(2).replace('.','')
-            if ':' not in convene_time_search.group(1):
-                convene_dt = datetime.strptime(f"{convene_time_search.group(1)}:00 {ampm}", "%I:%M %p")
-            else:
-                convene_dt = datetime.strptime(f"{convene_time_search.group(1)} {ampm}", "%I:%M %p")
-            convene_dt = datetime.combine(base_date.date(), convene_dt.time()).replace(tzinfo=self._dctz)
-            # Make a convene event
-            convene_event = {
-                'timestamp': convene_dt,
-                'type': chambers.const.CONVENE,
-                'description': intro_text,
-                'source': 'XML',
-                'source_url': source_url
-            }
-            self._logger.debug("Added Convene event {}".format(convene_event))
-            new_events.append(convene_event)
         else:
-            self._logger.debug("Could not extract sufficient data from intro text for convene event.")
+            convene_event = self._parse_intro_text(intro_text, base_date, source_url)
+            new_events.append(convene_event)
+
 
         # Check for a 'recess' or 'adjournment' at the end of the activity.
         recess = senate_tree.find("section[@type='recess']/content")
-        depart_type = None
         if recess is not None:
-            depart_type = chambers.const.RECESS_TIME
-            depart_string = recess
-        else:
-            adjournment = senate_tree.find("section[@type='adjournment']/content")
-            if isinstance(adjournment, ET.Element):
-                depart_type = chambers.const.ADJOURN
-                depart_string = adjournment
-            else:
-                depart_type = None
+            recess_events = self._parse_recess(recess.text, base_date, source_url)
+            new_events.extend(recess_events)
+            # depart_type = chambers.const.RECESS_TIME
+            # depart_string = recess
 
-        if depart_type is not None:
-            depart_string = depart_string.text.replace("\n", "")
-            self._logger.debug("Depart text is: {}".format(depart_string))
-            # Pull out the adjournment information.
-            aa_string = re.search("at\\s*(\\d{1,2}:\\d{1,2}) ([a|p]\\.?m\\.?)", depart_string)
-            self._logger.debug("Extracted data for departure - Time '{}', am/pm '{}'".format(aa_string.group(1), aa_string.group(2)))
-            ampm = aa_string.group(2).replace('.','')
-            aa_string = aa_string.group(1) + " " + ampm
-            depart_at = datetime.combine(base_date, datetime.strptime(aa_string, "%I:%M %p").time()).replace(
-                tzinfo=self._dctz)
+        # Check for adjournment. This shouldn't happen at the same time as a recess.
+        adjournment = senate_tree.find("section[@type='adjournment']/content")
+        if isinstance(adjournment, ET.Element):
+            adjournment_events = self._parse_adjournment(adjournment.text, base_date, source_url)
+            new_events.extend(adjournment_events)
+            # depart_type = chambers.const.ADJOURN
+            # depart_string = adjournment
 
-            # Make an event out of this.
-            depart_event = {
-                'timestamp': depart_at,
-                'type': depart_type,
-                'description': depart_string,
-                'source': 'XML',
-                'source_url': source_url
-            }
-            new_events.append(depart_event)
+        # Check for convinfo
+        # convinfo = senate_tree.find("convinfo")
 
-            # Find the next convening.
-            until_pos = re.search("until", depart_string)
-            convening_text = depart_string[until_pos.span()[0]:]
-            self._logger.debug(f"Convene text is: {convening_text}")
-            #ct_string = re.search("until(?:\\s*)(\\d{1,2}:?\\d{0,2}) ([a|p].?m.?)", convening_text)
-            ct_string = re.search("until\\s*(\\d{1,2}:?\\d{0,2}) ([a|p]\\.?m\\.?)", convening_text)
-            if ct_string is None:
-                if 'noon' in convening_text:
-                    ct_string = "12:00 pm"
-            else:
-                ampm = ct_string.group(2).replace('.','')
-                if ":" in ct_string.group(1):
-                    ct_string = ct_string.group(1) + " " + ampm
-                else:
-                    ct_string = ct_string.group(1) + ":00 " + ampm
-            self._logger.debug(f"Senate convene time string is '{ct_string}'")
-            convene_time = datetime.strptime(ct_string, "%I:%M %p").time().replace(tzinfo=self._dctz)
-            self._logger.debug(f"Senate convene time datetime is '{convene_time}'")
-            # Does this reference tomorrow?
-            if "tomorrow" in convening_text:
-                convenes_at = datetime.combine((base_date + timedelta(days=1)).date(), convene_time)
-                convenes_event = {
-                    'timestamp': convenes_at,
-                    'type': chambers.const.CONVENE_SCHEDULED,
-                    'description': depart_string,
-                    'source': 'XML',
-                    'source_url': source_url
-                }
-                new_events.append(convenes_event)
 
         added_events = 0
         for event in new_events:
@@ -356,6 +289,234 @@ class Senate(Chamber):
             self._logger.debug("Removing item at position {}, timestamp {}".format(item, self._events[item]['timestamp']))
             self._events.pop(item)
         return True
+
+    def _parse_adjournment(self, adjournment_text, base_date, source_url):
+        """ Parse an adjournment action.
+
+        :param adjournment_text: The text from the Senate's adjournment item.
+        :type adjournment_text: str
+        :param base_date: Base date for the events.
+        :type base_date: datetime.datetime
+        :param source_url: The URL this data came from, to be baked into the event.
+        :type source_url: str
+        :returns: List of events to add. Empty if no events to add.
+        :rtype: list
+        """
+        new_events = []
+        adjournment_text = adjournment_text.replace("\n", "")
+        self._logger.info(f"Adjournment text is '{adjournment_text}'")
+        adjournment_time = self._time_from_string(adjournment_text, 'at')
+
+        # if "Under the authority of the order of" in adjournment_text:
+        #     # When adjourned at a previous date, we need to adjust the base date.
+        #     adjourn_date_search = re.search("order of\\s*\\w*,\\s*(\\w*)\\s*(\\d*),\\s*(\\d{4})", adjournment_text)
+        #     adjourn_date = self._date_from_senate_string(
+        #         adjourn_date_search.group(1),
+        #         adjourn_date_search.group(2),
+        #         adjourn_date_search.group(3)
+        #     )
+        #     adjourn_at = datetime.combine(adjourn_date, adjournment_time).replace(tzinfo=self._dctz)
+        # else:
+        adjourn_at = datetime.combine(base_date, adjournment_time).replace(tzinfo=self._dctz)
+
+        adjournment_event = {
+            'timestamp': adjourn_at,
+            'type': chambers.const.ADJOURN,
+            'description': adjournment_text,
+            'source': 'XML',
+            'source_url': source_url
+        }
+        new_events.append(adjournment_event)
+
+        convene_event = self._parse_next_convening(adjournment_text, base_date, source_url)
+        if convene_event is not None:
+            new_events.append(convene_event)
+
+        return new_events
+
+    def _parse_intro_text(self, intro_text, base_date, source_url):
+        """ Parse the intro text item. This should have the convening.
+
+        :param intro_text: The text from the Senate's intro_text item.
+        :type intro_text: str
+        :param base_date: Base date for the events.
+        :type base_date: datetime.datetime
+        :param source_url: The URL this data came from, to be baked into the event.
+        :type source_url: str
+        :returns: Event to add
+        :rtype: dict
+        """
+        intro_text = intro_text.replace('\n','')
+        self._logger.info(f"Parsing intro text '{intro_text}'")
+        convene_time = self._time_from_string(intro_text, "to order at")
+        convene_dt = datetime.combine(base_date.date(), convene_time).replace(tzinfo=self._dctz)
+        # Make a convene event
+        convene_event = {
+            'timestamp': convene_dt,
+            'type': chambers.const.CONVENE,
+            'description': intro_text,
+            'source': 'XML',
+            'source_url': source_url
+        }
+
+        return convene_event
+
+    def _parse_recess(self, recess_text, base_date, source_url):
+        """ Parse recess item
+
+        :param recess_text: The text from the Senate's recess item.
+        :type recess_text:
+        :param base_date: Base date for the events.
+        :type base_date: datetime.datetime
+        :returns: List of events to add. Empty if no events to add.
+        :rtype: list
+        """
+        new_events = []
+        recess_text = recess_text.replace("\n", "")
+        self._logger.info(f"Recess text is '{recess_text}'")
+        recess_time = self._time_from_string(recess_text, 'at')
+        depart_at = datetime.combine(base_date, recess_time).replace(tzinfo=self._dctz)
+
+        recess_event = {
+            'timestamp': depart_at,
+            'type': chambers.const.RECESS,
+            'description': recess_text,
+            'source': 'XML',
+            'source_url': source_url
+        }
+        new_events.append(recess_event)
+
+        convene_event = self._parse_next_convening(recess_text, base_date, source_url)
+        if convene_event is not None:
+            new_events.append(convene_event)
+
+        return new_events
+
+    def _parse_next_convening(self, depart_text, base_date, source_url):
+        """
+        Extract the next convening from a recess or adjournment string.
+
+        :param depart_text: The text from the Senate's recess item.
+        :type depart_text:
+        :param base_date: Base date for the events.
+        :type base_date: datetime.datetime
+        :param source_url: The URL this data came from, to be baked into the event.
+        :type source_url: str
+        :returns: List of events to add. Empty if no events to add.
+        :rtype: list
+
+        """
+
+        # Find the next convening.
+        until_pos = re.search("until", depart_text)
+        convening_text = depart_text[until_pos.span()[0]:]
+        self._logger.debug(f"Convene text is: {convening_text}")
+        convene_time = self._time_from_string(convening_text, 'until')
+        self._logger.debug(f"Senate convene time is '{convene_time}'")
+        # Does this reference tomorrow?
+        if "tomorrow" in convening_text:
+            convenes_at = datetime.combine((base_date + timedelta(days=1)).date(), convene_time)
+            convenes_event = {
+                'timestamp': convenes_at,
+                'type': chambers.const.CONVENE_SCHEDULED,
+                'description': depart_text,
+                'source': 'XML',
+                'source_url': source_url
+            }
+            return convenes_event
+        else:
+            convene_date_search = re.search("on\\s*\\w*,\\s*(\\w*)\\s*(\\d*),\\s*(\\d{4})", convening_text)
+            if len(convene_date_search.groups()) == 3:
+                convene_date = self._date_from_senate_string(
+                    convene_date_search.group(1),
+                    convene_date_search.group(2),
+                    convene_date_search.group(3)
+                )
+                convenes_at = datetime.combine(convene_date, convene_time).replace(tzinfo=self._dctz)
+                convenes_event = {
+                    'timestamp': convenes_at,
+                    'type': chambers.const.CONVENE_SCHEDULED,
+                    'description': depart_text,
+                    'source': 'XML',
+                    'source_url': source_url
+                }
+                return convenes_event
+        return None
+
+    def _date_from_senate_string(self, month_name, day, year):
+        """ Extract date from a string
+
+        :param month_name: Name of the month, in English (ie: "June", "July", etc)
+        :type month_name: str
+        :param day: Day of the month
+        :type day: int
+        :param year: The year
+        :type year: int
+        :returns: Date object
+        :rtype: datetime.date
+        """
+
+        month_names = {
+            "january": 1,
+            "february": 2,
+            "march": 3,
+            "april": 4,
+            "may": 5,
+            "june": 6,
+            "july": 7,
+            "august": 8,
+            "september": 9,
+            "october": 10,
+            "november": 11,
+            "december": 12
+        }
+
+        # Find the month number. We do this to be locale neutral.
+        try:
+            month_num = month_names[month_name.lower()]
+        except KeyError as ke:
+            self._logger.error(f"Month name '{month_name}' not found.")
+            raise ke
+        else:
+            return datetime(month=int(month_num), day=int(day), year=int(year)).date()
+
+    def _time_from_string(self, input_string, prefix):
+        """ Extract time from the Senate's string
+
+        :param input_string: String to try to get a time out of.
+        :type input_string: str
+        :param prefix: Text in front of the time. Usually something like 'to order at' or 'until'.
+        :type prefix: str
+
+        :returns: Time object with the time extracted from the text. This is a literal, non-timezone aware time.
+        :rtype: datetime.time
+        """
+
+        self._logger.debug(f"Trying to extract time from string '{input_string}'")
+        search = f"{prefix}\\s*(\\d{{1,2}}:?\\d{{0,2}}) ([a|p]\\.?m\\.?)"
+        time_search = re.search(search, input_string)
+
+        if time_search is None:
+            if 'noon' in input_string:
+                ct_string = "12:00 pm"
+            else:
+                self._logger.warning(f"No usable time found in text '{input_string}'")
+                return None
+        elif len(time_search.groups()) > 2:
+            self._logger.warning(f"Too many times in text '{input_string}'")
+            return None
+        elif len(time_search.groups()) < 2:
+            self._logger.warning(f"No usable time found in text '{input_string}'")
+            return None
+        else:
+            ampm = time_search.group(2).replace('.', '')
+            if ":" in time_search.group(1):
+                ct_string = time_search.group(1) + " " + ampm
+            else:
+                ct_string = time_search.group(1) + ":00 " + ampm
+
+        return datetime.strptime(f"{ct_string}", "%I:%M %p").time()
+
 
     @staticmethod
     def _floor_activity_url(month, day, year):
