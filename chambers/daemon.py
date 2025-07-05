@@ -2,14 +2,15 @@
 Python Daemon to watch Congressional chambers and publish status via MQTT.
 """
 
+import chambers
+from datetime import datetime
 import logging
 import json
 import os
+import paho.mqtt.client
 import signal
 import sys
-import paho.mqtt.client
-import chambers
-from datetime import datetime
+import time
 
 class ChamberWatcher:
     """
@@ -17,7 +18,8 @@ class ChamberWatcher:
     """
 
     def __init__(self, mqtt_host, mqtt_username, mqtt_password, mqtt_port=1883, mqtt_qos=0,
-                 mqtt_client_id = 'chambers', mqtt_base = 'chambers', ha_base = 'homeassistant', log_level=logging.INFO):
+                 mqtt_client_id = 'chambers', mqtt_base = 'chambers', ha_base = 'homeassistant', log_level=logging.INFO,
+                 log_mqtt=False):
         """
 
         :param mqtt_host: MQTT host to connect to.
@@ -38,6 +40,8 @@ class ChamberWatcher:
         :type ha_base: str
         :param log_level: Level to log at. Defaults to 'warning'.
         :type log_level: str
+        :param log_mqtt: Should MQTT logging be enabled? If True, a logger will be attached to the client object and set to debug. Likely only needed for development.
+        :type log_mqtt: bool
         """
 
         # Set up the logger!
@@ -52,6 +56,10 @@ class ChamberWatcher:
         self._logger.addHandler(ch)
 
         self._logger.info("Chambers Initializing...")
+
+        # Register the signal handlers.
+        self._register_signal_handlers()
+
         # Save parameters
         self._client_id = mqtt_client_id
         self._mqtt_host = mqtt_host
@@ -64,9 +72,16 @@ class ChamberWatcher:
 
         # Make default variables.
         self._mqtt_status = 'disconnected'
+        self._last_connect = 0
 
         # Make the client.
         self._create_mqtt_client()
+
+        # If MQTT logging is requested, do it.
+        if log_mqtt:
+            mqtt_logger = self._logger.getChild('MQTT')
+            mqtt_logger.setLevel(logging.DEBUG)
+            self._mqtt_client.enable_logger(mqtt_logger)
 
         # Connect!
         self.connect()
@@ -193,8 +208,12 @@ class ChamberWatcher:
         self._logger.debug("Entering run loop.")
         while True:
             if self._mqtt_status == 'disconnected':
-                self.connect()
+                if time.monotonic() - self._last_connect >= 10:
+                    result = self.connect()
+                    if not result:
+                        self._last_connect = time.monotonic()
             elif self._mqtt_status in ('connecting','disconnected-planned'):
+                # Wait for the connection to be acknowledged.
                 pass
             else:
                 # Update the House.
@@ -261,9 +280,13 @@ class ChamberWatcher:
         else:
             self._logger.critical("Exit requested. Performing cleanup actions.")
 
-        # All we should need to do to cleanup is send an offline message to HA. We could rely on the will, but this is
-        # maybe more "proper"?
-        self._send_offline()
+        # Send an offline message and then disconnect. Either may fail if we're disconnected, that's okay.
+
+        try:
+            self._send_offline()
+            self._mqtt_client.disconnect()
+        except BaseException:
+            pass
 
         self._logger.critical("Cleanup complete.")
         # Return a signal. We consider some exits clean, others we throw back the signal number that called us.
@@ -282,12 +305,18 @@ class ChamberWatcher:
         try:
             self._mqtt_client.connect(self._mqtt_host, self._mqtt_port)
             self._mqtt_client.loop_start()
-            self._mqtt_status = 'connecting' # This is connect*ing* because we need to await the ACK from the broker.
         except ConnectionError as error:
             self._logger.error(f"Could not connect to MQTT broker: {error}")
-            sys.exit(1)
+            self._mqtt_status = 'disconnected'
+            return False
+        except TimeoutError:
+            self._logger.error("Socket timed out.")
+            self._mqtt_status = 'disconnected'
+            return False
         else:
             self._logger.info("Connection started. Awaiting broker acknowledgement.")
+            self._mqtt_status = 'connecting'
+            return True
 
     def _send_online(self):
         """
@@ -420,6 +449,12 @@ class ChamberWatcher:
         )
         return return_data
 
+    def _clean_exit(self):
+        """
+        Exit cleanly.
+        """
+        self.disconnect
+
 def chambers_cli():
 
     # If run as main, try to get everything from the environmemnt and run.
@@ -458,7 +493,8 @@ def chambers_cli():
         mqtt_client_id=MQTT_CLIENTID,
         mqtt_base=MQTT_BASE,
         ha_base = MQTT_HABASE,
-        log_level=LOGVAL
+        log_level=LOGVAL,
+        log_mqtt=True
     )
     cw.run()
 
