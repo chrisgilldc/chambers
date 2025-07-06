@@ -22,7 +22,7 @@
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
-[![project_license][license-shield]][license-url]
+[![GPL-3.0-or-later][license-shield]][license-url]
 [![LinkedIn][linkedin-shield]][linkedin-url]
 
 
@@ -30,7 +30,7 @@
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/github_username/repo_name">
+  <a href="https://github.com/chrisgilldc/chambers">
     <img src="images/Seal_of_the_United_States_Congress.svg" alt="Logo" width="80" height="80">
   </a>
 
@@ -39,14 +39,14 @@
   <p align="center">
     Current status of the U.S. Congress
     <br />
-    <a href="https://github.com/github_username/repo_name"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/chrisgilldc/chambers"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/github_username/repo_name">View Demo</a>
+    <a href="https://github.com/chrisgilldc/chambers">View Demo</a>
     &middot;
-    <a href="https://github.com/github_username/repo_name/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
+    <a href="https://github.com/chrisgilldc/chambers/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
     &middot;
-    <a href="https://github.com/github_username/repo_name/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
+    <a href="https://github.com/chrisgilldc/chambers/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
   </p>
 </div>
 
@@ -83,97 +83,99 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-[![Product Name Screen Shot][product-screenshot]](https://example.com)
+Chambers collects data from multiple sources to provide near-real-time status of the House of Representatives and the Senate.
 
-Here's a blank template to get started. To avoid retyping too much info, do a search and replace with your text editor for the following: `github_username`, `repo_name`, `twitter_handle`, `linkedin_username`, `email_client`, `email`, `project_title`, `project_description`, `project_license`
+House data is collected from the Clerk of the House's Floor Proceeding XML files. These are updated frequently throughout
+the day while the House is in session.
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+Senate data is collected from the Senate's LIS Floor Activity XML and the Floor Schedule JSON. The Senate's XML data is
+generally only available for the previous day. The JSON is a snapshot of the current proceedings. This data is merged to
+determine current status.
 
-
-
-### Built With
-
-* [![Next][Next.js]][Next-url]
-* [![React][React.js]][React-url]
-* [![Vue][Vue.js]][Vue-url]
-* [![Angular][Angular.io]][Angular-url]
-* [![Svelte][Svelte.dev]][Svelte-url]
-* [![Laravel][Laravel.com]][Laravel-url]
-* [![Bootstrap][Bootstrap.com]][Bootstrap-url]
-* [![JQuery][JQuery.com]][JQuery-url]
+This library was written largely to feed data into Home Assistant. The Add-on wrapper is separated and available [here](https://github.com/chrisgilldc/addon-chambers).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
 
 <!-- GETTING STARTED -->
 ## Getting Started
 
-This is an example of how you may give instructions on setting up your project locally.
-To get a local copy up and running follow these simple example steps.
-
-### Prerequisites
-
-This is an example of how to list things you need to use the software and how to install them.
-* npm
-  ```sh
-  npm install npm@latest -g
-  ```
-
 ### Installation
 
-1. Get a free API Key at [https://example.com](https://example.com)
-2. Clone the repo
-   ```sh
-   git clone https://github.com/github_username/repo_name.git
-   ```
-3. Install NPM packages
-   ```sh
-   npm install
-   ```
-4. Enter your API in `config.js`
-   ```js
-   const API_KEY = 'ENTER YOUR API';
-   ```
-5. Change git remote url to avoid accidental pushes to base project
-   ```sh
-   git remote set-url origin github_username/repo_name
-   git remote -v # confirm the changes
-   ```
+Package can be installed simply via pip into your python environment.
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+```
+pip install chambers
+```
 
+If you want the latest and greatest development version, install from the github dev branch
 
+```
+pip install git+https://github.com/chrisgilldc/chambers@dev
+```
+
+Either way, all required packages should be installed by pip.
 
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
+Import the library and instantiate an object of the appropriate type.
 
-_For more examples, please refer to the [Documentation](https://example.com)_
+```
+import chambers
+house_object = chambers.House()
+senate_object = chambers.Senate()
+```
+
+Each object has common methods and properties 
+* update() - Updates the chamber's data from sources if next update time has come. Include force=True to update no matter what. Returns True if data was loaded, False if not.
+* convened - Is the chamber in session?
+* convened_at - If convened, datetime of when the chamber convened, otherwise None.
+* convenes_at - If not convened, datetime of when the chamber is scheduled to convene, otherwise None.
+* adjourned_at - If not convened, datetime of when the chamber adjourned, otherwise None.
+
+All datetimes are timezone-aware to make conversion easier to your local time.
+
+```
+>>> house_object.update()
+2025-07-06 08:33:39,847 - House - INFO - No events available at update. Loading.
+2025-07-06 08:33:46,295 - House - INFO - Found floor proceedings for 02 Jul 2025. Loading.
+2025-07-06 08:33:46,424 - House - INFO - Event H61000 - Adjournment
+2025-07-06 08:33:46,457 - House - INFO - Event H20100 - New Legislative Day.
+2025-07-06 08:33:46,460 - House - INFO - Processed all floor actions.
+2025-07-06 08:33:46,463 - House - INFO - Loaded 9 events from journal on 02 Jul 2025
+2025-07-06 08:33:46,468 - House - INFO - Sorting events.
+2025-07-06 08:33:46,471 - House - INFO - Load complete.
+True
+>>> house_object.convened_at
+>>> house_object.convenes_at
+datetime.datetime(2025, 7, 7, 10, 0, tzinfo=zoneinfo.ZoneInfo(key='America/New_York'))
+>>> house_object.adjourned_at
+datetime.datetime(2025, 7, 3, 14, 33, 17, tzinfo=zoneinfo.ZoneInfo(key='America/New_York'))
+```
+
+### Daemonization
+
+An MQTT daemon, 'chamber-watcher', is also installed as part of the package, intended for use by the Home Assistant 
+add-on, although it should work stand-alone.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
 
 <!-- ROADMAP -->
 ## Roadmap
 
-- [ ] Feature 1
-- [ ] Feature 2
-- [ ] Feature 3
-    - [ ] Nested Feature
+- [ ] Allow logging to be suppressed during updates. May not be desirable for library use.
+- [ ] Refine 'activity' method for the House to allow more detailed current activity.
+- [ ] A more granular 'convene' that considers recesses.
 
-See the [open issues](https://github.com/github_username/repo_name/issues) for a full list of proposed features (and known issues).
+See the [open issues](https://github.com/chrisgilldc/chambers/issues) for a full list of proposed features (and known issues).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
 
 <!-- CONTRIBUTING -->
 ## Contributing
 
-Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+This is one of my first public projects so I won't claim I have any great knowledge or skill in accepting or managing contributions.
+That said, any contributions you make are **greatly appreciated**.
 
 If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
 Don't forget to give the project a star! Thanks again!
@@ -188,55 +190,29 @@ Don't forget to give the project a star! Thanks again!
 
 ### Top contributors:
 
-<a href="https://github.com/github_username/repo_name/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=github_username/repo_name" alt="contrib.rocks image" />
+<a href="https://github.com/chrisgilldc/chambers/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=chrisgilldc/chambers" alt="contrib.rocks image" />
 </a>
-
-
 
 <!-- LICENSE -->
 ## License
 
-Distributed under the project_license. See `LICENSE.txt` for more information.
+Distributed under the GPL-3.0-or-later. See `LICENSE.txt` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-
-<!-- CONTACT -->
-## Contact
-
-Your Name - [@twitter_handle](https://twitter.com/twitter_handle) - email@email_client.com
-
-Project Link: [https://github.com/chrisgilldc/chambers](https://github.com/chrisgilldc/chambers)
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
-
-<!-- ACKNOWLEDGMENTS -->
-## Acknowledgments
-
-* []()
-* []()
-* []()
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[contributors-shield]: https://img.shields.io/github/contributors/github_username/repo_name.svg?style=for-the-badge
-[contributors-url]: https://github.com/github_username/repo_name/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/github_username/repo_name.svg?style=for-the-badge
-[forks-url]: https://github.com/github_username/repo_name/network/members
-[stars-shield]: https://img.shields.io/github/stars/github_username/repo_name.svg?style=for-the-badge
-[stars-url]: https://github.com/github_username/repo_name/stargazers
-[issues-shield]: https://img.shields.io/github/issues/github_username/repo_name.svg?style=for-the-badge
-[issues-url]: https://github.com/github_username/repo_name/issues
-[license-shield]: https://img.shields.io/github/license/github_username/repo_name.svg?style=for-the-badge
-[license-url]: https://github.com/github_username/repo_name/blob/master/LICENSE.txt
+[contributors-shield]: https://img.shields.io/github/contributors/chrisgilldc/chambers.svg?style=for-the-badge
+[contributors-url]: https://github.com/chrisgilldc/chambers/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/chrisgilldc/chambers.svg?style=for-the-badge
+[forks-url]: https://github.com/chrisgilldc/chambers/network/members
+[stars-shield]: https://img.shields.io/github/stars/chrisgilldc/chambers.svg?style=for-the-badge
+[stars-url]: https://github.com/chrisgilldc/chambers/stargazers
+[issues-shield]: https://img.shields.io/github/issues/chrisgilldc/chambers.svg?style=for-the-badge
+[issues-url]: https://github.com/chrisgilldc/chambers/issues
+[license-shield]: https://img.shields.io/github/license/chrisgilldc/chambers.svg?style=for-the-badge
+[license-url]: https://github.com/chrisgilldc/chambers/blob/master/LICENSE.txt
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
 [linkedin-url]: https://linkedin.com/in/linkedin_username
 [product-screenshot]: images/screenshot.png
