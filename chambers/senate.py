@@ -113,7 +113,8 @@ class Senate(Chamber):
         if xml:
             i = 0
             days_loaded = 0
-            while days_loaded < 3:
+            while (self._search_events(types=chambers.const.CONVENE) is None and
+                   self._search_events(types=chambers.const.ADJOURN) is None):
                 search_date = (datetime.now() - timedelta(days=i))
                 fa_url = self._floor_activity_url(search_date.month, search_date.day, search_date.year)
                 self._logger.info(f"Trying to load from Floor Activity URL {fa_url}")
