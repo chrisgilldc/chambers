@@ -58,16 +58,6 @@ class Chamber:
         """
         raise NotImplemented("Must be implemented by a specific base class.")
 
-    # @property
-    # def adjourned_at(self):
-    #     """
-    #     When the chamber adjourned. Returns datetime if adjourned, None if in session.
-    #
-    #     :return: datetime or None
-    #     """
-    #
-    #     raise NotImplemented("Must be implemented by a specific base class.")
-
     @property
     def adjourned_at(self):
         """
@@ -109,8 +99,6 @@ class Chamber:
         else:
             return False
 
-
-
     # @property
     # def convened(self):
     #     """
@@ -148,27 +136,6 @@ class Chamber:
             return next_convene['timestamp']
         else:
             return None
-
-    # @property
-    # def convened_at(self):
-    #     """
-    #     When the chamber convened for its main session. Does *not* consider Recesses. Will return Datetime if convened,
-    #     None if adjourned.
-    #
-    #     :return: datetime or None
-    #     """
-    #
-    #     raise NotImplemented("Must be implemented by a specific base class.")
-    #
-    # @property
-    # def convenes_at(self):
-    #     """
-    #     When the chamber will convene next. Returns a datetime if adjourned and a reconvening is set, None otherwise.
-    #
-    #     :return: datetime or None
-    #     """
-    #
-    #     raise NotImplemented("Must be implemented by a specific base class.")
 
     @property
     def latest(self):
