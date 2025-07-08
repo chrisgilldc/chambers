@@ -32,53 +32,16 @@ class Senate(Chamber):
         """
         super().__init__("Senate", parent_logger, log_level)
 
-        self._convene_dt = None # Stores the information from the floor activity JSON
-
-    # @property
-    # def adjourned_at(self):
-    #     """
-    #     When the chamber adjourned. Returns datetime if adjourned, None if in session.
-    #
-    #     :return: datetime or None
-    #     """
-    #
-    #     return self._adjourned_at
-
-    # @property
-    # def convened(self):
-    #     """
-    #     Is the Senate convened?
-    #     :return:
-    #     """
-    #     return self._convened
-    #
-    #
-    # @property
-    # def convened_at(self):
-    #     """
-    #     When the Senate convened for its main session. Does *not* consider Recesses. Will return Datetime if convened,
-    #     None if adjourned.
-    #
-    #     :return: datetime or None
-    #     """
-    #
-    #     return self._convened_at
-    #
-    # @property
-    # def convenes_at(self):
-    #     """
-    #     When the Senate will convene next. Returns a datetime if adjourned and a reconvening is set, None otherwise.
-    #
-    #     :return: datetime or None
-    #     """
-    #
-    #     return self._convenes_at
+        # self._convene_dt = None # Stores the information from the floor activity JSON
 
     def update(self, force=False):
         """
-        Update the Senate. Load if necessary.
+        Update the Senate. Load if time is up or force is specified.
 
-        :return:
+        :param force: Force an update, even if time isn't up.
+        :type force: bool
+        :return: True if update performed, False if not.
+        :rtype: bool
         """
         if force:
             # Always load if we're forced, or if we don't have any data yet.
@@ -146,7 +109,7 @@ class Senate(Chamber):
         self._logger.info("Sorting events.")
         self._sort_events()
         # self._trim_event_log()
-        self._updated = datetime.now(self._dctz)
+        self._updated = datetime.now(tz=self._dctz)
         self._logger.info("Load complete.")
         return True
 
@@ -207,7 +170,7 @@ class Senate(Chamber):
         # Create an XML tree.
         senate_tree = ET.fromstring(floor_proceedings)
         # Pull out the base date. This has to get combined with the time later.
-        base_date = datetime.strptime(senate_tree.find('date_iso_8601').text, '%Y-%m-%d')
+        base_date = datetime.strptime(senate_tree.find('date_iso_8601').text, '%Y-%m-%d').replace(tzinfo=self._dctz)
         self._logger.debug(f"Extracted base date {base_date}")
 
         # Parse the Intro Text for a convening *time*
@@ -306,7 +269,7 @@ class Senate(Chamber):
         new_events = []
         adjournment_text = adjournment_text.replace("\n", "")
         self._logger.info(f"Adjournment text is '{adjournment_text}'")
-        adjournment_time = self._time_from_string(adjournment_text, 'at')
+        adjournment_time = self._time_from_senate_string(adjournment_text, 'at')
 
         # if "Under the authority of the order of" in adjournment_text:
         #     # When adjourned at a previous date, we need to adjust the base date.
@@ -349,7 +312,7 @@ class Senate(Chamber):
         """
         intro_text = intro_text.replace('\n','')
         self._logger.info(f"Parsing intro text '{intro_text}'")
-        convene_time = self._time_from_string(intro_text, "to order at")
+        convene_time = self._time_from_senate_string(intro_text, "to order at")
         convene_dt = datetime.combine(base_date.date(), convene_time).replace(tzinfo=self._dctz)
         # Make a convene event
         convene_event = {
@@ -375,7 +338,7 @@ class Senate(Chamber):
         new_events = []
         recess_text = recess_text.replace("\n", "")
         self._logger.info(f"Recess text is '{recess_text}'")
-        recess_time = self._time_from_string(recess_text, 'at')
+        recess_time = self._time_from_senate_string(recess_text, 'at')
         depart_at = datetime.combine(base_date, recess_time).replace(tzinfo=self._dctz)
 
         recess_event = {
@@ -412,11 +375,11 @@ class Senate(Chamber):
         until_pos = re.search("until", depart_text)
         convening_text = depart_text[until_pos.span()[0]:]
         self._logger.debug(f"Convene text is: {convening_text}")
-        convene_time = self._time_from_string(convening_text, 'until')
+        convene_time = self._time_from_senate_string(convening_text, 'until')
         self._logger.debug(f"Senate convene time is '{convene_time}'")
         # Does this reference tomorrow?
         if "tomorrow" in convening_text:
-            convenes_at = datetime.combine((base_date + timedelta(days=1)).date(), convene_time)
+            convenes_at = datetime.combine((base_date + timedelta(days=1)).date(), convene_time).replace(tzinfo=self._dctz)
             convenes_event = {
                 'timestamp': convenes_at,
                 'type': chambers.const.CONVENE_SCHEDULED,
@@ -481,7 +444,7 @@ class Senate(Chamber):
         else:
             return datetime(month=int(month_num), day=int(day), year=int(year)).date()
 
-    def _time_from_string(self, input_string, prefix):
+    def _time_from_senate_string(self, input_string, prefix):
         """ Extract time from the Senate's string
 
         :param input_string: String to try to get a time out of.
