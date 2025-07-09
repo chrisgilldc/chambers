@@ -18,7 +18,7 @@ class ChamberWatcher:
     """
 
     def __init__(self, mqtt_host, mqtt_username, mqtt_password, mqtt_port=1883, mqtt_qos=0,
-                 mqtt_client_id = 'chambers', mqtt_base = 'chambers', ha_base = 'homeassistant', log_level=logging.INFO,
+                 mqtt_client_id = 'chambers', mqtt_base = 'chambers', ha_base = 'homeassistant', log_level=logging.WARNING,
                  log_mqtt=False):
         """
 
@@ -468,6 +468,7 @@ def chambers_cli():
     MQTT_CLIENTID = os.getenv("MQTT_CLIENTID") or 'chambers'
     MQTT_QOS = os.getenv("MQTT_QOS") or 0
     LOGLEVEL = os.getenv("LOGLEVEL") or 'INFO'
+    LOGMQTT = os.getenv("LOGMQTT") or False
 
     LOGVAL = logging.getLevelName(LOGLEVEL.upper())
     if not isinstance(LOGVAL, int):
@@ -480,9 +481,9 @@ def chambers_cli():
         print(f"MQTT_PORT must be an integer number!")
         sys.exit(1)
 
-    print(f"Using Environment values:\nHOST: {MQTT_HOST}\nPORT: {MQTT_PORT}\nUSERNAME: {MQTT_USERNAME}\n"
-           f"PASSWORD: {MQTT_PASSWORD}\nQOS: {MQTT_QOS}\nClient ID: {MQTT_CLIENTID}\nBase: {MQTT_BASE}\n"
-           f"HA Base: {MQTT_HABASE}\nLog Level: {LOGLEVEL} ({LOGVAL})")
+    # print(f"Using Environment values:\nHOST: {MQTT_HOST}\nPORT: {MQTT_PORT}\nUSERNAME: {MQTT_USERNAME}\n"
+    #        f"PASSWORD: {MQTT_PASSWORD}\nQOS: {MQTT_QOS}\nClient ID: {MQTT_CLIENTID}\nBase: {MQTT_BASE}\n"
+    #        f"HA Base: {MQTT_HABASE}\nLog Level: {LOGLEVEL} ({LOGVAL})")
 
     cw = ChamberWatcher(
         mqtt_host=MQTT_HOST,
@@ -494,7 +495,7 @@ def chambers_cli():
         mqtt_base=MQTT_BASE,
         ha_base = MQTT_HABASE,
         log_level=LOGVAL,
-        log_mqtt=True
+        log_mqtt=LOGMQTT
     )
     cw.run()
 
