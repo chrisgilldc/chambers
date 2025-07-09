@@ -182,7 +182,8 @@ class Senate(Chamber):
             return 0
         else:
             convene_event = self._parse_intro_text(intro_text, base_date, source_url)
-            new_events.append(convene_event)
+            if convene_event is not None:
+                new_events.append(convene_event)
 
 
         # Check for a 'recess' or 'adjournment' at the end of the activity.
@@ -313,17 +314,20 @@ class Senate(Chamber):
         intro_text = intro_text.replace('\n','')
         self._logger.info(f"Parsing intro text '{intro_text}'")
         convene_time = self._time_from_senate_string(intro_text, "to order at")
-        convene_dt = datetime.combine(base_date.date(), convene_time).replace(tzinfo=self._dctz)
-        # Make a convene event
-        convene_event = {
-            'timestamp': convene_dt,
-            'type': chambers.const.CONVENE,
-            'description': intro_text,
-            'source': 'XML',
-            'source_url': source_url
-        }
+        if convene_time is not None:
+            convene_dt = datetime.combine(base_date.date(), convene_time).replace(tzinfo=self._dctz)
+            # Make a convene event
+            convene_event = {
+                'timestamp': convene_dt,
+                'type': chambers.const.CONVENE,
+                'description': intro_text,
+                'source': 'XML',
+                'source_url': source_url
+            }
 
-        return convene_event
+            return convene_event
+        else:
+            return None
 
     def _parse_recess(self, recess_text, base_date, source_url):
         """ Parse recess item
