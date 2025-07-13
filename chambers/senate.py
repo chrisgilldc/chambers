@@ -34,7 +34,7 @@ class Senate(Chamber):
 
         # self._convene_dt = None # Stores the information from the floor activity JSON
 
-    def update(self, force=False):
+    def update(self, force=False, days=3):
         """
         Update the Senate. Load if time is up or force is specified.
 
@@ -53,15 +53,23 @@ class Senate(Chamber):
                 raise ChamberExceptionRecoverable from urle
             return True
         elif datetime.now(timezone.utc) > self.next_update:
-            self._load()
+            self._load(days=days)
             return True
         else:
             return False
 
 
-    def _load(self, xml=True, json=True):
+    def _load(self, xml=True, json=True, days=None):
         """
         Load data about the state of the Senate from XML and JSON sources.
+
+        :param xml: Should the Senate's XML sources be loaded?
+        :type xml: bool
+        :param json: Should the Senate's JSON source be loaded?
+        :type json: bool
+        :param days: How many days of XML data should be loaded? If None, will continue until both a CONVENE and ADJOURN
+        event have been found.
+        :type days: int
         :return:
         """
 
@@ -80,8 +88,9 @@ class Senate(Chamber):
         if xml:
             i = 0
             days_loaded = 0
-            while (self._search_events(types=chambers.const.CONVENE) is None and
-                   self._search_events(types=chambers.const.ADJOURN) is None):
+            done_loading = False
+            while done_loading is False:
+
                 search_date = (datetime.now() - timedelta(days=i))
                 fa_url = self._floor_activity_url(search_date.month, search_date.day, search_date.year)
                 self._logger.info(f"Trying to load from Floor Activity URL {fa_url}")
@@ -113,6 +122,16 @@ class Senate(Chamber):
 
                     days_loaded += 1
                 i += 1
+
+                # Check for end condition, based on the input options.
+                if days is None:
+                    if (self._search_events(types=chambers.const.CONVENE) is None and
+                       self._search_events(types=chambers.const.ADJOURN) is None):
+                        done_loading = True
+                else:
+                    if days_loaded >= days:
+                        done_loading = True
+            self._logger.info(f"Loaded {days_loaded} days of Senate XML data.")
 
 
         self._logger.info("Sorting events.")
@@ -187,7 +206,7 @@ class Senate(Chamber):
         try:
             intro_text = senate_tree.find("intro_text").text
         except AttributeError:
-            self._logger.info("File has no 'intro_text', nothing usable here.")
+            self._logger.debug("File has no 'intro_text', nothing usable here.")
             return 0
         else:
             convene_event = self._parse_intro_text(intro_text, base_date, source_url)
@@ -278,7 +297,7 @@ class Senate(Chamber):
         """
         new_events = []
         adjournment_text = adjournment_text.replace("\n", "")
-        self._logger.info(f"Adjournment text is '{adjournment_text}'")
+        self._logger.debug(f"Adjournment text is '{adjournment_text}'")
         adjournment_time = self._time_from_senate_string(adjournment_text, 'at')
 
         # if "Under the authority of the order of" in adjournment_text:
@@ -321,7 +340,7 @@ class Senate(Chamber):
         :rtype: dict
         """
         intro_text = intro_text.replace('\n','')
-        self._logger.info(f"Parsing intro text '{intro_text}'")
+        self._logger.debug(f"Parsing intro text '{intro_text}'")
         convene_time = self._time_from_senate_string(intro_text, "to order at")
         if convene_time is not None:
             convene_dt = datetime.combine(base_date.date(), convene_time).replace(tzinfo=self._dctz)
