@@ -100,8 +100,13 @@ class Senate(Chamber):
                         (datetime.now() - timedelta(days=i)).strftime('%d %b %Y')
                     ))
                     event_count = self._load_xml(senate_xml_response.content, fa_url)
-                    self._logger.info("Loaded {} events from journal on {}".format(event_count,(datetime.now()
-                            - timedelta(days=i)).strftime('%d %b %Y') ))
+                    if event_count == 1:
+                        noun = 'event'
+                    else:
+                        noun = 'events'
+                    self._logger.info(f"Loaded {event_count} {noun} from journal on "
+                                      f"{(datetime.now() - timedelta(days=i)).strftime('%d %b %Y')}")
+
                     days_loaded += 1
                 i += 1
 
