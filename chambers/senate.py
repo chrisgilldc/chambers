@@ -67,8 +67,12 @@ class Senate(Chamber):
 
         # Load the JSON.
         if json:
-            loaded = self._load_json()
-            self._logger.info(f"Loaded {loaded} events from JSON.")
+            event_count = self._load_json()
+            if event_count == 1:
+                noun = 'event'
+            else:
+                noun = 'events'
+            self._logger.info(f"Loaded {event_count} {noun} from JSON.")
 
         # Try the XML. XML usually isn't published until the day after, so this is only useful for the previous day's
         # adjournment. Still, try today, maybe that will change.
