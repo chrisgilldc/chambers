@@ -489,7 +489,7 @@ class Senate(Chamber):
         """
 
         self._logger.debug(f"Trying to extract time from string '{input_string}'")
-        search = f"{prefix}\\s*(\\d{{1,2}}:?\\d{{0,2}}) ([a|p]\\.?m\\.?)"
+        search = f"{prefix}\\s*(\\d{{1,2}}:?\\d{{0,2}}) ([a|p]\\s*\\.?m\\s*\\.?)"
         time_search = re.search(search, input_string)
 
         if time_search is None:
