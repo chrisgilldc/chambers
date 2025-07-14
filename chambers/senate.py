@@ -34,7 +34,7 @@ class Senate(Chamber):
 
         # self._convene_dt = None # Stores the information from the floor activity JSON
 
-    def update(self, force=False, days=3):
+    def update(self, force=False, days=None):
         """
         Update the Senate. Load if time is up or force is specified.
 
@@ -90,7 +90,6 @@ class Senate(Chamber):
             days_loaded = 0
             done_loading = False
             while done_loading is False:
-
                 search_date = (datetime.now() - timedelta(days=i))
                 fa_url = self._floor_activity_url(search_date.month, search_date.day, search_date.year)
                 self._logger.info(f"Trying to load from Floor Activity URL {fa_url}")
@@ -125,8 +124,8 @@ class Senate(Chamber):
 
                 # Check for end condition, based on the input options.
                 if days is None:
-                    if (self._search_events(types=chambers.const.CONVENE) is None and
-                       self._search_events(types=chambers.const.ADJOURN) is None):
+                    if (self._search_events(types=chambers.const.CONVENE) is not None and
+                       self._search_events(types=chambers.const.ADJOURN) is not None):
                         done_loading = True
                 else:
                     if days_loaded >= days:
