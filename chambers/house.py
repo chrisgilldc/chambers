@@ -194,7 +194,11 @@ class House(Chamber):
         :rtype: int
         """
 
-        house_tree = ET.fromstring(house_xml)
+        try:
+            house_tree = ET.fromstring(house_xml)
+        except ET.ParseError as xmlerror:
+            self._logger.error(f"Could not parse XML. Received error '{xmlerror}'. Skiping.")
+            return 0
         # Get the publication date for this file.
         pubdate = datetime.strptime(house_tree.find('pubDate').text[:-4], "%a, %d %b %Y %H:%M:%S")
         pubdate = pubdate.replace(tzinfo=self._dctz)

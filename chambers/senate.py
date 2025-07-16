@@ -195,7 +195,11 @@ class Senate(Chamber):
         new_events = []
 
         # Create an XML tree.
-        senate_tree = ET.fromstring(floor_proceedings)
+        try:
+            senate_tree = ET.fromstring(floor_proceedings)
+        except ET.ParseError as xmlerror:
+            self._logger.error(f"Could not parse XML from source {source_url}. Received error '{xmlerror}'. Skiping.")
+            return 0
         # Pull out the base date. This has to get combined with the time later.
         base_date = datetime.strptime(senate_tree.find('date_iso_8601').text, '%Y-%m-%d').replace(tzinfo=self._dctz)
         self._logger.debug(f"Extracted base date {base_date}")
