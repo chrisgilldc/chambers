@@ -508,7 +508,7 @@ class Senate(Chamber):
             self._logger.warning(f"No usable time found in text '{input_string}'")
             return None
         else:
-            ampm = time_search.group(2).replace('.', '')
+            ampm = time_search.group(2).replace('.', '').replace(' ','')
             if ":" in time_search.group(1):
                 ct_string = time_search.group(1) + " " + ampm
             else:
