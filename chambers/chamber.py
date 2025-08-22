@@ -4,8 +4,12 @@ Chamber base class.
 
 import chambers.const
 from datetime import datetime, timedelta, timezone
+#import json
 import logging
 from operator import itemgetter
+import os
+import pathlib
+import pickle
 import zoneinfo
 from zoneinfo import ZoneInfo
 
@@ -41,13 +45,23 @@ class Chamber:
         self._convened = None
         self._convened_at = None
         self._convenes_at = None
+
         self._will_convene_at = None
         self._adjourned_at = None
 
+        # Set the cache file.
+        self.cache_path = name.lower() + '.cache'
+        self._logger.info(f"Cache path is: {self.cache_path}")
+        self._logger.info(f"Cache exists? {self.cache_path.exists()}")
+
         # Base DC timezone, since we need this a lot.
         self._dctz = zoneinfo.ZoneInfo('America/New_York')
-        # Initialize updated as an arbitrarily old date.
+        # Initialize time trackers as 1/1/1900 so they trip reset on startup.
+        self._next_update = datetime(1900, 1, 1, 0, 0, 0, tzinfo=self._dctz)
         self._updated = datetime(1900, 1, 1, 0, 0, 0, tzinfo=self._dctz)
+
+        if self.cache_path.exists():
+            self.load_cache()
 
     @property
     def activity(self):
@@ -76,6 +90,28 @@ class Chamber:
             return latest_adjourn['timestamp']
         else:
             return None
+
+
+    @property
+    def cache_path(self):
+        """ Cache file path"""
+        return self._cache_path
+
+    @cache_path.setter
+    def cache_path(self, cache_file):
+        """
+        Set the cache file. If not provided an absolute path, use the current working directory.
+
+        :param: cache_file
+        :type: str or pathlib.Path
+        """
+
+        cache_path = pathlib.Path(cache_file)
+        if cache_path.is_absolute():
+            self._cache_path = cache_path
+        else:
+            self._logger.info("Cache path is not absolute. Putting cache file in current working directory.")
+            self._cache_path = pathlib.Path().cwd() / cache_path
 
 
     @property
@@ -119,7 +155,10 @@ class Chamber:
         """
         if self.convened:
             latest_convene = self._search_events(types=chambers.const.CONVENE)
-            return latest_convene['timestamp']
+            if latest_convene is None:
+                return None
+            else:
+                return latest_convene['timestamp']
         else:
             return None
 
@@ -159,19 +198,33 @@ class Chamber:
         When the next update is scheduled.
         :return: float or datetime
         """
+        return self._next_update
 
+    def _set_next_update(self):
+        """
+        Calculate the next update from the current status of the chamber and known events.
+
+       :return: None
+        """
         if self.convened:
+            self._logger.debug("Chamber is convened. Setting next update to 2 minutes from now.")
             return (self._updated + timedelta(minutes=2)).replace(second=0, microsecond=0)
         else:
             # If we know when the chamber next convenes, the next check should be ten minutes before that.
             if self.convenes_at is not None:
                 preconvene_target = self.convenes_at - timedelta(minutes=10)
                 if preconvene_target < datetime.now(timezone.utc):
-                    return self._updated + timedelta(seconds=60)
+                    self._logger.debug(
+                        "Chamber is adjourned and has scheduled convening that was missed. Setting next update to 60 seconds from now.")
+                    self._next_update = self._updated + timedelta(seconds=60)
                 else:
-                    return preconvene_target
+                    self._logger.debug(
+                        "Chamber is not convened and has scheduled convening. Setting next update to 10 minutes prior.")
+                    self._next_update = preconvene_target
             else:
-                return self._updated + timedelta(minutes=10)
+                self._logger.debug(
+                    "Chamber is not convened without scheduled convening. Setting next update to 10 minutes from now.")
+                self._next_update = self._updated + timedelta(minutes=10)
 
     def update(self, force=False):
         """
@@ -191,6 +244,46 @@ class Chamber:
         """
 
         raise NotImplemented("Must be implemented by a specific base class.")
+
+    def load_cache(self):
+        """
+        Load the event log from a specified cache file.
+        """
+        try:
+            with open(self.cache_path, 'rb') as cache_fh:
+                status = pickle.load(cache_fh)
+        except FileNotFoundError as fnfe:
+            self._logger.warning("Cache file not found.")
+            return False
+        else:
+            # Assign the cached events to the events log.
+            self._events = status['events']
+            self._updated = status['updated']
+            self._next_update = status['next_update']
+            return True
+
+    def save_cache(self):
+        """
+        Save the event log to a cache file.
+        """
+        self._logger.debug(f"Saving cache data to '{self.cache_path}'.")
+        new_cache = self.cache_path.parent / f"{self.cache_path.name}.new"
+
+        with open(new_cache, 'wb') as nc_fh:
+            status = {
+                'events': self._events,
+                'updated': self._updated,
+                'next_update': self.next_update
+            }
+            #json.dump(self._events, new_cache)
+            pickle.dump(status, nc_fh)
+        # New cache successfully written. Remove old cache.
+        try:
+            os.remove(self.cache_path)
+        except FileNotFoundError:
+            pass
+        # Move the new cache into the correct place.
+        os.rename(new_cache, self.cache_path)
 
     def _search_events(self, timestamp=None, search_forward=False, types=None):
         """

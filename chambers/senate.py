@@ -15,7 +15,6 @@ import zoneinfo
 
 from .exceptions import ChamberExceptionRecoverable
 
-
 class Senate(Chamber):
     """
     Senate current status and calendar
@@ -31,8 +30,6 @@ class Senate(Chamber):
         :param log_level: Log level.
         """
         super().__init__("Senate", parent_logger, log_level)
-
-        # self._convene_dt = None # Stores the information from the floor activity JSON
 
     def update(self, force=False, days=None):
         """
@@ -57,7 +54,6 @@ class Senate(Chamber):
             return True
         else:
             return False
-
 
     def _load(self, xml=True, json=True, days=None):
         """
@@ -138,6 +134,7 @@ class Senate(Chamber):
         # self._trim_event_log()
         self._updated = datetime.now(tz=self._dctz)
         self._logger.info("Load complete.")
+        super()._set_next_update()
         return True
 
     def _load_json(self):

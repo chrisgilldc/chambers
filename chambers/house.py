@@ -47,14 +47,17 @@ class House(Chamber):
             # Always load if we're forced, or if we don't have any data yet.
             self._logger.info("Force load set, updating.")
             self._load()
+            super()._set_next_update()
             return True
         elif len(self._events) == 0:
             self._logger.info("No events available at update. Loading.")
             self._load()
+            super()._set_next_update()
             return True
         elif datetime.now(timezone.utc) > self.next_update:
             self._logger.info("Update time has passed. Loading.")
             self._load()
+            super()._set_next_update()
             return True
         else:
             return False
@@ -75,7 +78,6 @@ class House(Chamber):
         #             return True
         # return False
 
-    @property
     def activity(self, timestamp=None):
         """
         Get the current activity based on the event log.
@@ -91,11 +93,11 @@ class House(Chamber):
         else:
             target_dt = datetime.now(timezone.utc)
 
-        for event in self._events:
-            if selected_event is None:
-                selected_event = event
-            elif event['timestamp'] <= target_dt and event['timestamp'] > selected_event['timestamp']:
-                selected_event = event
+        if target_dt > datetime.now(timezone.utc):
+            selected_event = self._search_events(target_dt, search_forward=True)
+        else:
+            selected_event = self._search_events(target_dt)
+
         return selected_event
 
 
@@ -340,4 +342,5 @@ class House(Chamber):
                 # Add to the event log.
                 self._events.append(event)
         return True
+
 
