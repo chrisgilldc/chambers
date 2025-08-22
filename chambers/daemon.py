@@ -3,7 +3,7 @@ Python Daemon to watch Congressional chambers and publish status via MQTT.
 """
 
 import chambers
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import json
 import os
@@ -16,12 +16,10 @@ class ChamberWatcher:
     """
     Class to monitor the US Congress. Create one, then run it.
     """
-
     def __init__(self, mqtt_host, mqtt_username, mqtt_password, mqtt_port=1883, mqtt_qos=0,
                  mqtt_client_id = 'chambers', mqtt_base = 'chambers', ha_base = 'homeassistant', log_level=logging.WARNING,
                  log_mqtt=False):
         """
-
         :param mqtt_host: MQTT host to connect to.
         :type mqtt_host: str
         :param mqtt_username: MQTT username to use.
@@ -73,6 +71,7 @@ class ChamberWatcher:
         # Make default variables.
         self._mqtt_status = 'disconnected'
         self._last_connect = 0
+        self._next_cache_write = datetime(1900, 1, 1, 0, 0, 0)
 
         # Make the client.
         self._create_mqtt_client()
@@ -232,6 +231,10 @@ class ChamberWatcher:
                     self._pub_message(self._topics['senate_convenes_at'], self._senate.convenes_at)
                     self._logger.info("Senate next update: {} ({})".format(self._senate.next_update, type(self._senate.next_update)))
                     self._pub_message(self._topics['senate_next_update'], self._senate.next_update)
+            # Check for cache dump.
+                if datetime.now() > self._next_cache_write:
+                    self._logger.info("Cache deadline passed. Saving caches.")
+                    self._save_caches()
 
     @property
     def __class__(self):
@@ -313,10 +316,30 @@ class ChamberWatcher:
             self._logger.error("Socket timed out.")
             self._mqtt_status = 'disconnected'
             return False
+        except OSError as oe:
+            # OSError might cover multiple types of errors, so we have to check the error number to see what it is.
+            if oe.errno == 113:
+                self._logger.error("No route to host!")
+                self._mqtt_status = 'disconnected'
+                return False
+            else:
+                raise oe
         else:
             self._logger.info("Connection started. Awaiting broker acknowledgement.")
             self._mqtt_status = 'connecting'
             return True
+
+    def _save_caches(self):
+        """
+        Save the House and Senate caches.
+        """
+        self._logger.info("Saving House cache.")
+        self._house.save_cache()
+        self._logger.info("Saving Senate cache.")
+        self._senate.save_cache()
+        # Update the timer.
+        self._next_cache_write = (datetime.now() + timedelta(hours=1)).replace(minute=0,second=0,microsecond=0)
+        self._logger.info(f"Next cache save at {self._next_cache_write.strftime('%Y-%m-%d %-I:%M %p')}")
 
     def _send_online(self):
         """
@@ -449,14 +472,8 @@ class ChamberWatcher:
         )
         return return_data
 
-    def _clean_exit(self):
-        """
-        Exit cleanly.
-        """
-        self.disconnect
-
 def chambers_cli():
-
+    """ Chambers command line interface. """
     # If run as main, try to get everything from the environmemnt and run.
 
     MQTT_HOST = os.getenv("MQTT_HOST")

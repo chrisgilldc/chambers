@@ -52,31 +52,15 @@ class House(Chamber):
         elif len(self._events) == 0:
             self._logger.info("No events available at update. Loading.")
             self._load()
-            super()._set_next_update()
+            self._set_next_update()
             return True
         elif datetime.now(timezone.utc) > self.next_update:
             self._logger.info("Update time has passed. Loading.")
             self._load()
-            super()._set_next_update()
+            self._set_next_update()
             return True
         else:
             return False
-        #     since_update = ( datetime.now(self._dctz) - self._updated ).seconds
-        #     if not self.convened:
-        #         if self.convenes_at is not None:
-        #             # If we're within 10 minutes of the convening time, update once a minute.
-        #             if (self.convenes_at - timedelta(minutes=10) ) < datetime.now(timezone.utc) and since_update > 60:
-        #                 self._load()
-        #                 return True
-        #         else:
-        #             if since_update > 600:
-        #                 self._load()
-        #                 return True
-        #     else:
-        #         if since_update > 120:
-        #             self._load()
-        #             return True
-        # return False
 
     def activity(self, timestamp=None):
         """
