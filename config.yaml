@@ -1,0 +1,18 @@
+name: "Chambers"
+version: "0.1.1-alpha1"
+slug: chambers
+stage: experimental
+description: "Congressional Chamber Status"
+url: "https://github.com/chrisgilldc/addon-chambers/"
+arch: # Should work on all architectures, it's pure python.
+  - armhf
+  - armv7
+  - aarch64
+  - amd64
+  - i386
+init: false
+startup: application
+services:
+  - "mqtt:need"
+schema:
+  log_level: list(debug|info|warning|error)?

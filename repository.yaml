@@ -1,0 +1,4 @@
+# https://developers.home-assistant.io/docs/add-ons/repository#repository-configuration
+name: Chambers Home Assistant Add-On
+url: 'https://github.com/chrisgilldc/addon-chambers'
+maintainer: Chris Gill <chris@chrisgill.net>

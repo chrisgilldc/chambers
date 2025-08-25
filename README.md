@@ -85,6 +85,8 @@
 
 Chambers collects data from multiple sources to provide near-real-time status of the House of Representatives and the Senate.
 
+This is available as a pip-installable library and as an Add-On to Home Assistant.
+
 House data is collected from the Clerk of the House's Floor Proceeding XML files. These are updated frequently throughout
 the day while the House is in session.
 
@@ -92,14 +94,12 @@ Senate data is collected from the Senate's LIS Floor Activity XML and the Floor 
 generally only available for the previous day. The JSON is a snapshot of the current proceedings. This data is merged to
 determine current status.
 
-This library was written largely to feed data into Home Assistant. The Add-on wrapper is separated and available [here](https://github.com/chrisgilldc/addon-chambers).
-
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- GETTING STARTED -->
 ## Getting Started
 
-### Installation
+### Library Installation
 
 Package can be installed simply via pip into your python environment.
 
@@ -115,8 +115,17 @@ pip install git+https://github.com/chrisgilldc/chambers@dev
 
 Either way, all required packages should be installed by pip.
 
-<!-- USAGE EXAMPLES -->
+### Add-On Installation
+
+Add the Github URL to Home Assistant.
+
+Install.
+
+Boom.
+
 ## Usage
+
+### Library Usage
 
 Import the library and instantiate an object of the appropriate type.
 
@@ -152,6 +161,19 @@ datetime.datetime(2025, 7, 7, 10, 0, tzinfo=zoneinfo.ZoneInfo(key='America/New_Y
 >>> house_object.adjourned_at
 datetime.datetime(2025, 7, 3, 14, 33, 17, tzinfo=zoneinfo.ZoneInfo(key='America/New_York'))
 ```
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+### Add-On Usage
+
+For each chamber, four entities are created:
+* Convened - Is the chamber currently convened?
+* Convened At - When the chamber convened, if it is. Otherwise unknown.
+* Convenes At - If adjourned, when the chamber is scheduled to convene. Otherwise, unknown.
+* Adjourned At - If adjourned, when the chamber adjourned. Otherwise, unknown.
+
+A 'Running' sensor for the Add-on is also provided.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### Daemonization
 
