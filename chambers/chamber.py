@@ -62,6 +62,7 @@ class Chamber:
 
         if self.cache_path.exists():
             self.load_cache()
+            self.update()
 
     @property
     def activity(self):

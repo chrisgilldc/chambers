@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.1-alpha2
+ - Fix updating after cache load. Otherwise the system can get in a loop and never actually update.
+
 ## 0.1.1-alpha1
  - Merge python library and Home Assistant add-on. Same repository should now be pip-installable and HA-Add-Onable
  - Add caching mechanism. Chamber objects now have the ability to add and restore their state to a dump file.

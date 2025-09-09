@@ -1,5 +1,5 @@
 name: "Chambers"
-version: "0.1.1-alpha1"
+version: "0.1.1-alpha2"
 slug: chambers
 stage: experimental
 description: "Congressional Chamber Status"
@@ -14,5 +14,10 @@ init: false
 startup: application
 services:
   - "mqtt:need"
+options:
+  clear_cache: False
+  log_level: warning
 schema:
   log_level: list(debug|info|warning|error)?
+  clear_cache: bool
+

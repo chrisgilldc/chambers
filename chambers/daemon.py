@@ -8,6 +8,7 @@ import logging
 import json
 import os
 import paho.mqtt.client
+import pathlib
 import signal
 import sys
 import time
@@ -486,6 +487,7 @@ def chambers_cli():
     MQTT_QOS = os.getenv("MQTT_QOS") or 0
     LOGLEVEL = os.getenv("LOGLEVEL") or 'INFO'
     LOGMQTT = os.getenv("LOGMQTT") or False
+    CLEAR_CACHE = os.getenv("CLEAR_CACHE") or False
 
     LOGVAL = logging.getLevelName(LOGLEVEL.upper())
     if not isinstance(LOGVAL, int):
@@ -498,9 +500,15 @@ def chambers_cli():
         print(f"MQTT_PORT must be an integer number!")
         sys.exit(1)
 
-    # print(f"Using Environment values:\nHOST: {MQTT_HOST}\nPORT: {MQTT_PORT}\nUSERNAME: {MQTT_USERNAME}\n"
-    #        f"PASSWORD: {MQTT_PASSWORD}\nQOS: {MQTT_QOS}\nClient ID: {MQTT_CLIENTID}\nBase: {MQTT_BASE}\n"
-    #        f"HA Base: {MQTT_HABASE}\nLog Level: {LOGLEVEL} ({LOGVAL})")
+    print(f"Using Environment values:\nHOST: {MQTT_HOST}\nPORT: {MQTT_PORT}\nUSERNAME: {MQTT_USERNAME}\n"
+            f"PASSWORD: {MQTT_PASSWORD}\nQOS: {MQTT_QOS}\nClient ID: {MQTT_CLIENTID}\nBase: {MQTT_BASE}\n"
+            f"HA Base: {MQTT_HABASE}\nLog Level: {LOGLEVEL} ({LOGVAL})")
+
+    if CLEAR_CACHE:
+        print("Clearing cache as requested!")
+        for cache_file in pathlib.Path('.').rglob('*.cache'):
+            print(f"Removing cache file {cache_file}")
+            pathlib.Path.unlink(cache_file)
 
     cw = ChamberWatcher(
         mqtt_host=MQTT_HOST,
