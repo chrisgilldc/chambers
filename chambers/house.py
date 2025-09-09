@@ -47,17 +47,17 @@ class House(Chamber):
             # Always load if we're forced, or if we don't have any data yet.
             self._logger.info("Force load set, updating.")
             self._load()
-            super()._set_next_update()
+            self._next_update = self._set_next_update()
             return True
         elif len(self._events) == 0:
             self._logger.info("No events available at update. Loading.")
             self._load()
-            self._set_next_update()
+            self._next_update = self._set_next_update()
             return True
         elif datetime.now(timezone.utc) > self.next_update:
             self._logger.info("Update time has passed. Loading.")
             self._load()
-            self._set_next_update()
+            self._next_update = self._set_next_update()
             return True
         else:
             return False

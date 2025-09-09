@@ -217,15 +217,19 @@ class Chamber:
                 if preconvene_target < datetime.now(timezone.utc):
                     self._logger.debug(
                         "Chamber is adjourned and has scheduled convening that was missed. Setting next update to 60 seconds from now.")
+                    self._logger.debug("Updated is {}".format(self._updated))
                     self._next_update = self._updated + timedelta(seconds=60)
+                    return None
                 else:
                     self._logger.debug(
                         "Chamber is not convened and has scheduled convening. Setting next update to 10 minutes prior.")
                     self._next_update = preconvene_target
+                    return None
             else:
                 self._logger.debug(
                     "Chamber is not convened without scheduled convening. Setting next update to 10 minutes from now.")
                 self._next_update = self._updated + timedelta(minutes=10)
+                return None
 
     def update(self, force=False):
         """

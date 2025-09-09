@@ -134,7 +134,7 @@ class Senate(Chamber):
         # self._trim_event_log()
         self._updated = datetime.now(tz=self._dctz)
         self._logger.info("Load complete.")
-        super()._set_next_update()
+        self._next_update = self._set_next_update()
         return True
 
     def _load_json(self):
