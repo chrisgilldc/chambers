@@ -340,7 +340,7 @@ class ChamberWatcher:
         self._senate.save_cache()
         # Update the timer.
         self._next_cache_write = (datetime.now() + timedelta(hours=1)).replace(minute=0,second=0,microsecond=0)
-        self._logger.info(f"Next cache save at {self._next_cache_write.strftime('%Y-%m-%d %-I:%M %p')}")
+        self._logger.info(f"Next cache save at {self._next_cache_write.strftime('%Y-%m-%d %-I:%M %p %z')}")
 
     def _send_online(self):
         """

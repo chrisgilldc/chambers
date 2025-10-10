@@ -24,14 +24,17 @@ class House(Chamber):
         'recess',
         'morning-hour')
 
-    def __init__(self, parent_logger=None, log_level=logging.INFO):
+    def __init__(self, load_cache = True, parent_logger=None, log_level=logging.INFO):
         """
-        Base chamber object.
+        House Chamber Object
+
+        :param load_cache: Should the cache be loaded on initialization? Defaults to True.
+        :type load_cache: bool
         :param parent_logger: Parent logger, if any.
         :type parent_logger: logging.Logger
         :param log_level: Log level.
         """
-        super().__init__("House", parent_logger, log_level)
+        super().__init__("House", load_cache, parent_logger, log_level)
 
     def update(self, force=False):
         """
@@ -47,17 +50,22 @@ class House(Chamber):
             # Always load if we're forced, or if we don't have any data yet.
             self._logger.info("Force load set, updating.")
             self._load()
-            self._next_update = self._set_next_update()
+            self._set_next_update()
+            return True
+        elif self.next_update is None:
+            self._logger.info("Next update is not set. Probably need to update now! Loading.")
+            self._load()
+            self._set_next_update()
             return True
         elif len(self._events) == 0:
             self._logger.info("No events available at update. Loading.")
             self._load()
-            self._next_update = self._set_next_update()
+            self._set_next_update()
             return True
         elif datetime.now(timezone.utc) > self.next_update:
             self._logger.info("Update time has passed. Loading.")
             self._load()
-            self._next_update = self._set_next_update()
+            self._set_next_update()
             return True
         else:
             return False
@@ -291,11 +299,12 @@ class House(Chamber):
                         self._logger.info("Event {} - New Legislative Day.".format(floor_action.get("act-id")))
                         event['type'] = chambers.const.CONVENE
                 elif floor_action.get('act-id') == 'H61000':
+                    self._logger.debug("Raw H61000 action: {}".format(floor_action))
                     # Adjourn
                     if 'The House adjourned.' in event['description']:
                         self._logger.info("Event {} - Adjournment.".format(floor_action.get("act-id")))
                         event['type'] = chambers.const.ADJOURN
-                    elif 'The Speaker announced that the House do now adjourn pursuant to clause 13 of Rule I' in event['description']:
+                    elif 'The Speaker announced that the House do now adjourn' in event['description']:
                         self._logger.info("Event {} - Adjournment".format(floor_action.get("act-id")))
                         event['type'] = chambers.const.ADJOURN
                     elif 'The Speaker announced that the House do now recess. The next meeting is scheduled for' in event['description']:

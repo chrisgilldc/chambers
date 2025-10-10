@@ -17,11 +17,14 @@ from zoneinfo import ZoneInfo
 class Chamber:
     _dctz: ZoneInfo
 
-    def __init__(self, name, parent_logger = None, log_level = logging.WARNING):
+    def __init__(self, name, load_cache = True, parent_logger = None, log_level = logging.WARNING):
         """
         Base chamber object.
+
         :param name: Chamber name. Probably going to be 'House' or 'Senate'!
         :type name: str
+        :param load_cache: Should the cache be loaded on initialization? Defaults to True.
+        :type load_cache: bool
         :param parent_logger: Parent logger, if any.
         :param log_level: Log level.
         """
@@ -52,7 +55,6 @@ class Chamber:
         # Set the cache file.
         self.cache_path = name.lower() + '.cache'
         self._logger.info(f"Cache path is: {self.cache_path}")
-        self._logger.info(f"Cache exists? {self.cache_path.exists()}")
 
         # Base DC timezone, since we need this a lot.
         self._dctz = zoneinfo.ZoneInfo('America/New_York')
@@ -60,9 +62,15 @@ class Chamber:
         self._next_update = datetime(1900, 1, 1, 0, 0, 0, tzinfo=self._dctz)
         self._updated = datetime(1900, 1, 1, 0, 0, 0, tzinfo=self._dctz)
 
-        if self.cache_path.exists():
-            self.load_cache()
-            self.update()
+        if load_cache:
+            if self.cache_path.exists():
+                self._logger.info("Loading cache.")
+                self.load_cache()
+                self.update()
+            else:
+                self._logger.info("Cache does not exist.")
+        else:
+            self._logger.info("Ignoring cache.")
 
     @property
     def activity(self):
@@ -208,27 +216,29 @@ class Chamber:
        :return: None
         """
         if self.convened:
-            self._logger.debug("Chamber is convened. Setting next update to 2 minutes from now.")
-            return (self._updated + timedelta(minutes=2)).replace(second=0, microsecond=0)
+            self._next_update = (self._updated + timedelta(minutes=2)).replace(second=0, microsecond=0)
+            self._logger.debug("Chamber is convened. Next update at {}".format(self.next_update))
+            return None
         else:
             # If we know when the chamber next convenes, the next check should be ten minutes before that.
             if self.convenes_at is not None:
                 preconvene_target = self.convenes_at - timedelta(minutes=10)
                 if preconvene_target < datetime.now(timezone.utc):
-                    self._logger.debug(
-                        "Chamber is adjourned and has scheduled convening that was missed. Setting next update to 60 seconds from now.")
                     self._logger.debug("Updated is {}".format(self._updated))
                     self._next_update = self._updated + timedelta(seconds=60)
+                    self._logger.info(
+                        "Chamber is adjourned and has scheduled convening that was missed. Next update - {}".format(self.next_update))
                     return None
                 else:
-                    self._logger.debug(
-                        "Chamber is not convened and has scheduled convening. Setting next update to 10 minutes prior.")
                     self._next_update = preconvene_target
+                    self._logger.debug(
+                        "Chamber is not convened and has scheduled convening. Next update - {}".format(self.next_update))
+
                     return None
             else:
-                self._logger.debug(
-                    "Chamber is not convened without scheduled convening. Setting next update to 10 minutes from now.")
                 self._next_update = self._updated + timedelta(minutes=10)
+                self._logger.debug(
+                    "Chamber is not convened without scheduled convening. Next update - {}".format(self.next_update))
                 return None
 
     def update(self, force=False):

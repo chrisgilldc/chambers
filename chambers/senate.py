@@ -22,14 +22,16 @@ class Senate(Chamber):
     floor_schedule_url = "https://www.senate.gov/legislative/schedule/floor_schedule.json"
 
 
-    def __init__(self, parent_logger=None, log_level=logging.WARNING):
+    def __init__(self, load_cache=True, parent_logger=None, log_level=logging.WARNING):
         """
-        Base chamber object.
+        Senate chamber object
 
+        :param load_cache: Should the cache be loaded on initialization? Defaults to True.
+        :type load_cache: bool
         :param parent_logger: Parent logger, if any.
-        :param log_level: Log level.
+        :param log_level: Log level. Defaults to Warning.
         """
-        super().__init__("Senate", parent_logger, log_level)
+        super().__init__("Senate", load_cache, parent_logger, log_level)
 
     def update(self, force=False, days=None):
         """
@@ -49,8 +51,14 @@ class Senate(Chamber):
                 self._logger.error("Cannot connect to Senate site ({}")
                 raise ChamberExceptionRecoverable from urle
             return True
+        elif self.next_update is None:
+            self._logger.info("Next update is not set. Probably need to update now! Loading.")
+            self._load()
+            self._set_next_update()
+            return True
         elif datetime.now(timezone.utc) > self.next_update:
             self._load(days=days)
+            self._set_next_update()
             return True
         else:
             return False
