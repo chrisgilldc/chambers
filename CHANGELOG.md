@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1-alpha4
+ - Notes to come
+
+## 0.1.1-alpha3
+ - Fixes issue where next_update variable in chamber wasn't set, so a chamber could get in a perpetual update loop.
+
 ## 0.1.1-alpha2
  - Fix updating after cache load. Otherwise the system can get in a loop and never actually update.
 

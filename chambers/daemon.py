@@ -83,12 +83,16 @@ class ChamberWatcher:
             mqtt_logger.setLevel(logging.DEBUG)
             self._mqtt_client.enable_logger(mqtt_logger)
 
-        # Connect!
-        self.connect()
-
         # Make the chamber objects.
         self._house = chambers.House(parent_logger=self._logger)
         self._senate = chambers.Senate(parent_logger=self._logger)
+
+        # # Connect!
+        # self.connect()
+        #
+        # # Send current state.
+        # self._send_house()
+        # self._send_senate()
 
     def _create_mqtt_client(self):
         """
@@ -210,7 +214,10 @@ class ChamberWatcher:
             if self._mqtt_status == 'disconnected':
                 if time.monotonic() - self._last_connect >= 10:
                     result = self.connect()
-                    if not result:
+                    if result: ## When successfully connected, immediately send current status.
+                        self._send_house()
+                        self._send_senate()
+                    else: # Otherwise, reset and wait 10s to connect again.
                         self._last_connect = time.monotonic()
             elif self._mqtt_status in ('connecting','disconnected-planned'):
                 # Wait for the connection to be acknowledged.
@@ -218,20 +225,10 @@ class ChamberWatcher:
             else:
                 # Update the House.
                 if self._house.update():
-                    self._pub_message(self._topics['house_convened'], self._house.convened)
-                    self._pub_message(self._topics['house_adjourned_at'], self._house.adjourned_at)
-                    self._pub_message(self._topics['house_convened_at'], self._house.convened_at)
-                    self._pub_message(self._topics['house_convenes_at'], self._house.convenes_at)
-                    self._logger.info("House next update: {} ({})".format(self._house.next_update, type(self._house.next_update)))
-                    self._pub_message(self._topics['house_next_update'], self._house.next_update)
+                    self._send_house()
                 # Update the Senate.
                 if self._senate.update():
-                    self._pub_message(self._topics['senate_convened'], self._senate.convened)
-                    self._pub_message(self._topics['senate_adjourned_at'], self._senate.adjourned_at)
-                    self._pub_message(self._topics['senate_convened_at'], self._senate.convened_at)
-                    self._pub_message(self._topics['senate_convenes_at'], self._senate.convenes_at)
-                    self._logger.info("Senate next update: {} ({})".format(self._senate.next_update, type(self._senate.next_update)))
-                    self._pub_message(self._topics['senate_next_update'], self._senate.next_update)
+                    self._send_senate()
             # Check for cache dump.
                 if datetime.now() > self._next_cache_write:
                     self._logger.info("Cache deadline passed. Saving caches.")
@@ -341,6 +338,31 @@ class ChamberWatcher:
         # Update the timer.
         self._next_cache_write = (datetime.now() + timedelta(hours=1)).replace(minute=0,second=0,microsecond=0)
         self._logger.info(f"Next cache save at {self._next_cache_write.strftime('%Y-%m-%d %-I:%M %p %z')}")
+
+    def _send_house(self):
+        """
+        Send the current House status to the Broker.
+        :return:
+        """
+        self._pub_message(self._topics['house_convened'], self._house.convened)
+        self._pub_message(self._topics['house_adjourned_at'], self._house.adjourned_at)
+        self._pub_message(self._topics['house_convened_at'], self._house.convened_at)
+        self._pub_message(self._topics['house_convenes_at'], self._house.convenes_at)
+        self._logger.info("House next update: {} ({})".format(self._house.next_update, type(self._house.next_update)))
+        self._pub_message(self._topics['house_next_update'], self._house.next_update)
+
+    def _send_senate(self):
+        """
+        Send the current Senate status to the Broker.
+        :return:
+        """
+        self._pub_message(self._topics['senate_convened'], self._senate.convened)
+        self._pub_message(self._topics['senate_adjourned_at'], self._senate.adjourned_at)
+        self._pub_message(self._topics['senate_convened_at'], self._senate.convened_at)
+        self._pub_message(self._topics['senate_convenes_at'], self._senate.convenes_at)
+        self._logger.info(
+            "Senate next update: {} ({})".format(self._senate.next_update, type(self._senate.next_update)))
+        self._pub_message(self._topics['senate_next_update'], self._senate.next_update)
 
     def _send_online(self):
         """
