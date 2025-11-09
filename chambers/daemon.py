@@ -136,7 +136,7 @@ class ChamberWatcher:
         self._send_online()
         # Subscribe to the Home Assistant status topic.
         self._mqtt_client.subscribe(f"homeassistant/status")
-        self._mqtt_client.message_callback_add("homeassistant/stats", self._on_hachange)
+        self._mqtt_client.message_callback_add("homeassistant/status", self._on_hachange)
         # Attach the general message callback
         # self._mqtt_client.on_message = self._on_message
         # Run Home Assistant Discovery
@@ -171,14 +171,15 @@ class ChamberWatcher:
         :type message: MQTTMessage
         :return:
         """
-        if message.payload == 'offline':
+        the_payload = message.payload.decode("utf-8")
+        if the_payload == 'offline':
             self._logger.warning("Home Assistant has gone offline!")
-        elif message.payload == 'online':
+        elif the_payload == 'online':
             self._logger.info("Home Assistant has gone online. Sending current status.")
             self._send_house()
             self._send_senate()
         else:
-            self._logger.warning("MQTT message on home assistant topic has unknown payload '{}'".format(message.payload))
+            self._logger.warning("MQTT message on home assistant topic has unknown payload '{}'".format(the_payload))
 
     def _pub_message(self, topic, payload, send_json=False):
         """
@@ -252,8 +253,8 @@ class ChamberWatcher:
                     self._send_senate()
                 # Check for cache dump.
                 if datetime.now() > self._next_cache_write:
-                    self._logger.info("Cache deadline passed. Saving caches.")
-                    self._save_caches()
+                   self._logger.info("Cache deadline passed. Saving caches.")
+                   self._save_caches()
 
     @property
     def __class__(self):
@@ -518,7 +519,7 @@ class ChamberWatcher:
 
 def chambers_cli():
     """ Chambers command line interface. """
-    # If run as main, try to get everything from the environmemnt and run.
+    # If run as main, try to get everything from the environment and run.
 
     MQTT_HOST = os.getenv("MQTT_HOST")
     MQTT_PORT = os.getenv("MQTT_PORT") or 1883
