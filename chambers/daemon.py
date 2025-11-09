@@ -71,6 +71,7 @@ class ChamberWatcher:
 
         # Make default variables.
         self._mqtt_status = 'disconnected'
+        self._ha_status = 'offline'
         self._last_connect = 0
         self._next_cache_write = datetime(1900, 1, 1, 0, 0, 0)
 
@@ -135,6 +136,7 @@ class ChamberWatcher:
         self._send_online()
         # Subscribe to the Home Assistant status topic.
         self._mqtt_client.subscribe(f"homeassistant/status")
+        self._mqtt_client.message_callback_add("homeassistant/stats", self._on_hachange)
         # Attach the general message callback
         # self._mqtt_client.on_message = self._on_message
         # Run Home Assistant Discovery
@@ -158,6 +160,25 @@ class ChamberWatcher:
             self._send_offline()
         # self._reconnect_timer = time.monotonic()
         self._mqtt_client.loop_stop()
+
+    def _on_hachange(self, client, userdata, message):
+        """
+        Callback for changes to the status of Home Assistant itself.
+
+        :param client: The client instance for this callback.
+        :param userdata: Private user data as set, if any.
+        :param message: MQTTMessage sent.
+        :type message: MQTTMessage
+        :return:
+        """
+        if message.payload == 'offline':
+            self._logger.warning("Home Assistant has gone offline!")
+        elif message.payload == 'online':
+            self._logger.info("Home Assistant has gone online. Sending current status.")
+            self._send_house()
+            self._send_senate()
+        else:
+            self._logger.warning("MQTT message on home assistant topic has unknown payload '{}'".format(message.payload))
 
     def _pub_message(self, topic, payload, send_json=False):
         """
@@ -229,7 +250,7 @@ class ChamberWatcher:
                 # Update the Senate.
                 if self._senate.update():
                     self._send_senate()
-            # Check for cache dump.
+                # Check for cache dump.
                 if datetime.now() > self._next_cache_write:
                     self._logger.info("Cache deadline passed. Saving caches.")
                     self._save_caches()

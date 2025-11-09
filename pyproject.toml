@@ -6,7 +6,7 @@ authors = [
 ]
 description = "Chamber - Current Congressional Status"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = [
     'paho-mqtt',
     'requests',
