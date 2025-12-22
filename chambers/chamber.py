@@ -15,9 +15,9 @@ from zoneinfo import ZoneInfo
 
 
 class Chamber:
-    _dctz: ZoneInfo
+    _dctz = zoneinfo.ZoneInfo('America/New_York')
 
-    def __init__(self, name, load_cache = True, parent_logger = None, log_level = logging.WARNING):
+    def __init__(self, name, load_cache = True, tz = 'America/New_York', parent_logger = None, log_level = logging.WARNING):
         """
         Base chamber object.
 
@@ -25,7 +25,10 @@ class Chamber:
         :type name: str
         :param load_cache: Should the cache be loaded on initialization? Defaults to True.
         :type load_cache: bool
+        :param tz: Timezone to output dates and times in. Defaults to DC time.
+        :type tz: str
         :param parent_logger: Parent logger, if any.
+        :type: logging.Logger
         :param log_level: Log level.
         """
 
@@ -43,12 +46,12 @@ class Chamber:
 
         # Save inputs.
         self._name = name
+        self._tz = zoneinfo.ZoneInfo(tz)
         # Initialize variables.
         self._events = [] # Event log.
         self._convened = None
         self._convened_at = None
         self._convenes_at = None
-
         self._will_convene_at = None
         self._adjourned_at = None
 
@@ -56,11 +59,9 @@ class Chamber:
         self.cache_path = name.lower() + '.cache'
         self._logger.info(f"Cache path is: {self.cache_path}")
 
-        # Base DC timezone, since we need this a lot.
-        self._dctz = zoneinfo.ZoneInfo('America/New_York')
         # Initialize time trackers as 1/1/1900 so they trip reset on startup.
-        self._next_update = datetime(1900, 1, 1, 0, 0, 0, tzinfo=self._dctz)
-        self._updated = datetime(1900, 1, 1, 0, 0, 0, tzinfo=self._dctz)
+        self._next_update = datetime(1900, 1, 1, 0, 0, 0, tzinfo=Chamber._dctz)
+        self._updated = datetime(1900, 1, 1, 0, 0, 0, tzinfo=Chamber._dctz)
 
         if load_cache:
             if self.cache_path.exists():
@@ -81,22 +82,31 @@ class Chamber:
         """
         raise NotImplemented("Must be implemented by a specific base class.")
 
-    @property
-    def adjourned_at(self):
+    def adjourned_at(self, tz=None):
         """
         When the chamber adjourned. Returns datetime if adjourned, None if in session.
 
+        :param tz: Timezone to report convened_at. Defaults to object's global timezone.
+        :type tz: str
+
         :return: datetime or None
         """
+
+        # If no TZ is passed, use the object global timezone.
+        if tz is None:
+            tz = self._tz
+        else:
+            # Convert the Timezone string to a zoneinfo object.
+            tz = zoneinfo.ZoneInfo(tz)
 
         latest_convene = self._search_events(types=chambers.const.CONVENE)
         latest_adjourn = self._search_events(types=chambers.const.ADJOURN)
         if latest_adjourn is None:
             return None
         elif latest_adjourn['timestamp'] is not None and latest_convene is None:
-            return latest_adjourn['timestamp']
+            return latest_adjourn['timestamp'].astimezone(tz)
         elif latest_adjourn['timestamp'] > latest_convene['timestamp']:
-            return latest_adjourn['timestamp']
+            return latest_adjourn['timestamp'].astimezone(tz)
         else:
             return None
 
@@ -144,44 +154,50 @@ class Chamber:
         else:
             return False
 
-    # @property
-    # def convened(self):
-    #     """
-    #     Is this chamber currently convened. This is determined based on the best information available.
-    #     Returns None if chamber state is unknown.
-    #
-    #     :return: bool or None
-    #     """
-    #     raise NotImplemented("Must be implemented by a specific base class.")
-
-    @property
-    def convened_at(self):
+    def convened_at(self, tz=None):
         """
         When the chamber convened for its main session. Does *not* consider Recesses. Will return Datetime if convened,
         None if adjourned.
 
+        :param tz: Timezone to report convened_at. Defaults to object's global timezone.
+        :type tz: str
+
         :return: datetime or None
         """
+
+        # If no TZ is passed, use the object global timezone.
+        if tz is None:
+            tz = self._tz
+        else:
+            # Convert the Timezone string to a zoneinfo object.
+            tz = zoneinfo.ZoneInfo(tz)
+
         if self.convened:
             latest_convene = self._search_events(types=chambers.const.CONVENE)
             if latest_convene is None:
                 return None
             else:
-                return latest_convene['timestamp']
+                return latest_convene['timestamp'].astimezone(tz)
         else:
             return None
 
-    @property
-    def convenes_at(self):
+    def convenes_at(self, tz=None):
         """
         When the chamber will convene next. Returns a datetime if adjourned and a reconvening is set, None otherwise.
 
         :return: datetime or None
         """
 
+        # If no TZ is passed, use the object global timezone.
+        if tz is None:
+            tz = self._tz
+        else:
+            # Convert the Timezone string to a zoneinfo object.
+            tz = zoneinfo.ZoneInfo(tz)
+
         next_convene = self._search_events(search_forward=True, types=chambers.const.CONVENE_SCHEDULED)
         if next_convene is not None:
-            return next_convene['timestamp']
+            return next_convene['timestamp'].astimezone(tz)
         else:
             return None
 
@@ -221,8 +237,8 @@ class Chamber:
             return None
         else:
             # If we know when the chamber next convenes, the next check should be ten minutes before that.
-            if self.convenes_at is not None:
-                preconvene_target = self.convenes_at - timedelta(minutes=10)
+            if self.convenes_at() is not None:
+                preconvene_target = self.convenes_at() - timedelta(minutes=10)
                 if preconvene_target < datetime.now(timezone.utc):
                     self._logger.debug("Updated is {}".format(self._updated))
                     self._next_update = self._updated + timedelta(seconds=60)
