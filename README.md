@@ -134,15 +134,21 @@ import chambers
 house_object = chambers.House()
 senate_object = chambers.Senate()
 ```
+Both objects take an optional 'tz' parameter which will set the default timezone for all output from the object. 
+TZ should be a valid timezone string (ie: 'Asia/Tokyo', 'Europe/Berlin', etc). If not set, system timezone will be used.
 
 Each object has common methods and properties 
-* update() - Updates the chamber's data from sources if next update time has come. Include force=True to update no matter what. Returns True if data was loaded, False if not.
-* convened - Is the chamber in session?
-* convened_at - If convened, datetime of when the chamber convened, otherwise None.
-* convenes_at - If not convened, datetime of when the chamber is scheduled to convene, otherwise None.
-* adjourned_at - If not convened, datetime of when the chamber adjourned, otherwise None.
 
-All datetimes are timezone-aware to make conversion easier to your local time.
+Property:
+* convened - Is the chamber in session? Either true or false.
+
+Methods:
+* update() - Updates the chamber's data from sources if next update time has come. Include force=True to update no matter what. Returns True if data was loaded, False if not.
+* convened_at() - If convened, datetime of when the chamber convened, otherwise None.
+* convenes_at() - If not convened, datetime of when the chamber is scheduled to convene, otherwise None.
+* adjourned_at() - If not convened, datetime of when the chamber adjourned, otherwise None.
+
+All the _at() methods accept an optional 'tz' parameter to override the object's default timezone for output.
 
 ```
 >>> house_object.update()
