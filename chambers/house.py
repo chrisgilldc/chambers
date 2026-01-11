@@ -103,8 +103,10 @@ class House(Chamber):
         """
 
         # Try to load today. Will 404 if House isn't in session yet.
+        target_url = House.URL_BASE + datetime.now().strftime('%Y%m%d') + ".xml"
+        self._logger.debug("Fetching House data from URL '{}'".format(target_url))
         try:
-            today_response = requests.get(House.URL_BASE + datetime.now().strftime('%Y%m%d') + ".xml")
+            today_response = requests.get(target_url)
         except requests.exceptions.ConnectionError as ce:
             self._logger.error(f"Exception while trying to retrieve today's journal - '{ce}'")
             return False
@@ -118,13 +120,16 @@ class House(Chamber):
         # Load previous day
         i = 1
         found_response = False
+        self._logger.debug("Attempting to load previous day's data.")
+
         while not found_response:
-            old_response = requests.get(House.URL_BASE + (datetime.now() - timedelta(days=i) ).strftime('%Y%m%d') + ".xml")
+            target_url = House.URL_BASE + (datetime.now() - timedelta(days=i) ).strftime('%Y%m%d') + ".xml"
+            self._logger.debug("Fetching House data from URL '{}'".format(target_url))
+            old_response = requests.get(target_url)
             if old_response.ok:
                 self._logger.info("Found floor proceedings for {}. Loading.".format(
                     (datetime.now() - timedelta(days=i)).strftime('%d %b %Y')
                 ))
-                # pprint(old_response.content)
                 if today_response.ok:
                     self._logger.info("Loading to extract adjournment.")
                     # Load the previous legislative days' XML only to get the adjournment data.
@@ -271,16 +276,16 @@ class House(Chamber):
                     elif 'The House convened, starting a new legislative day.' in event['description']:
                         self._logger.info("Event {} - New Legislative Day.".format(floor_action.get("act-id")))
                         event['type'] = chambers.const.CONVENE
+                # Adjournments and Recesses get lumped together as an H61000
                 elif floor_action.get('act-id') == 'H61000':
                     self._logger.debug("Raw H61000 action: {}".format(floor_action))
                     # Adjourn
-                    if 'The House adjourned.' in event['description']:
+                    if ('The House adjourned' or 'The Speaker announced that the House do now adjourn'
+                            in event['description']):
                         self._logger.info("Event {} - Adjournment.".format(floor_action.get("act-id")))
                         event['type'] = chambers.const.ADJOURN
-                    elif 'The Speaker announced that the House do now adjourn' in event['description']:
-                        self._logger.info("Event {} - Adjournment".format(floor_action.get("act-id")))
-                        event['type'] = chambers.const.ADJOURN
-                    elif 'The Speaker announced that the House do now recess. The next meeting is scheduled for' in event['description']:
+                    elif ('The Speaker announced that the House do now recess. The next meeting is scheduled for'
+                          in event['description']):
                         self._logger.info("Event {} - Recess to time.".format(floor_action.get("act-id")))
                         event['type'] = chambers.const.RECESS_TIME
                     elif 'The Speaker announced that the House do now recess. The next meeting is subject to the call of the Chair.' == event['description']:
