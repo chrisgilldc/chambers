@@ -24,17 +24,19 @@ class House(Chamber):
         'recess',
         'morning-hour')
 
-    def __init__(self, load_cache = True, parent_logger=None, log_level=logging.INFO):
+    def __init__(self, load_cache = True, tz = 'America/New_York', parent_logger=None, log_level=logging.INFO):
         """
         House Chamber Object
 
         :param load_cache: Should the cache be loaded on initialization? Defaults to True.
         :type load_cache: bool
+        :param tz: Timezone to output dates and times in. Defaults to DC time.
+        :type tz: str
         :param parent_logger: Parent logger, if any.
         :type parent_logger: logging.Logger
         :param log_level: Log level.
         """
-        super().__init__("House", load_cache, parent_logger, log_level)
+        super().__init__("House", load_cache, tz, parent_logger, log_level)
 
     def update(self, force=False):
         """
@@ -92,36 +94,6 @@ class House(Chamber):
 
         return selected_event
 
-
-    # @property
-    # @property
-    # def convened_at(self):
-    #     """
-    #     When the chamber convened for its main session. Does *not* consider Recesses. Will return Datetime if convened,
-    #     None if adjourned.
-    #
-    #     :return: datetime or None
-    #     """
-    #     if self.convened:
-    #         latest_convene = self._search_events(types=chambers.const.CONVENE)
-    #         return latest_convene['timestamp']
-    #     else:
-    #         return None
-    #
-    # @property
-    # def convenes_at(self):
-    #     """
-    #     When the chamber will convene next. Returns a datetime if adjourned and a reconvening is set, None otherwise.
-    #
-    #     :return: datetime or None
-    #     """
-    #
-    #     next_convene = self._search_events(search_forward=True, types=chambers.const.CONVENE_SCHEDULED)
-    #     if next_convene is not None:
-    #         return next_convene['timestamp']
-    #     else:
-    #         return None
-
     def _load(self):
         """
         Load current House activity.
@@ -131,8 +103,10 @@ class House(Chamber):
         """
 
         # Try to load today. Will 404 if House isn't in session yet.
+        target_url = House.URL_BASE + datetime.now().strftime('%Y%m%d') + ".xml"
+        self._logger.debug("Fetching House data from URL '{}'".format(target_url))
         try:
-            today_response = requests.get(House.URL_BASE + datetime.now().strftime('%Y%m%d') + ".xml")
+            today_response = requests.get(target_url)
         except requests.exceptions.ConnectionError as ce:
             self._logger.error(f"Exception while trying to retrieve today's journal - '{ce}'")
             return False
@@ -146,13 +120,16 @@ class House(Chamber):
         # Load previous day
         i = 1
         found_response = False
+        self._logger.debug("Attempting to load previous day's data.")
+
         while not found_response:
-            old_response = requests.get(House.URL_BASE + (datetime.now() - timedelta(days=i) ).strftime('%Y%m%d') + ".xml")
+            target_url = House.URL_BASE + (datetime.now() - timedelta(days=i) ).strftime('%Y%m%d') + ".xml"
+            self._logger.debug("Fetching House data from URL '{}'".format(target_url))
+            old_response = requests.get(target_url)
             if old_response.ok:
                 self._logger.info("Found floor proceedings for {}. Loading.".format(
                     (datetime.now() - timedelta(days=i)).strftime('%d %b %Y')
                 ))
-                # pprint(old_response.content)
                 if today_response.ok:
                     self._logger.info("Loading to extract adjournment.")
                     # Load the previous legislative days' XML only to get the adjournment data.
@@ -171,7 +148,7 @@ class House(Chamber):
         self._logger.info("Sorting events.")
         self._sort_events()
         # self._trim_event_log()
-        self._updated = datetime.now(self._dctz)
+        self._updated = datetime.now(timezone.utc)
         self._logger.info("Load complete.")
         return True
 
@@ -194,8 +171,9 @@ class House(Chamber):
             self._logger.error(f"Could not parse XML. Received error '{xmlerror}'. Skiping.")
             return 0
         # Get the publication date for this file.
-        pubdate = datetime.strptime(house_tree.find('pubDate').text[:-4], "%a, %d %b %Y %H:%M:%S")
-        pubdate = pubdate.replace(tzinfo=self._dctz)
+        # We don't seem to need this anymore?
+        # pubdate = datetime.strptime(house_tree.find('pubDate').text[:-4], "%a, %d %b %Y %H:%M:%S")
+        # pubdate = pubdate.replace(tzinfo=Chamber._dctz)
         events = []
         # Process all children.
         items = 0
@@ -233,7 +211,7 @@ class House(Chamber):
         """
 
         convenes_dt = datetime.strptime(
-            end_day.get('next-legislative-day-convenes'), "%Y%m%dT%H:%M").replace(tzinfo=self._dctz)
+            end_day.get('next-legislative-day-convenes'), "%Y%m%dT%H:%M").replace(tzinfo=Chamber._dctz)
         # Create a new future event.
         event = {
             'type': chambers.const.CONVENE_SCHEDULED,
@@ -261,7 +239,7 @@ class House(Chamber):
                 if self._events[i]['id'] == floor_action.get('unique-id'):
                     self._logger.debug("Floor action {} is already in event (item {})".format(floor_action.get('unique-id'),i))
                     # Have to do a DT conversion here.
-                    fa_dt = datetime.strptime(floor_action.get('update-date-time'), "%Y%m%dT%H:%M").replace(tzinfo=self._dctz)
+                    fa_dt = datetime.strptime(floor_action.get('update-date-time'), "%Y%m%dT%H:%M").replace(tzinfo=Chamber._dctz)
                     if fa_dt > self._events[i]['updated']:
                         # If the new floor action matches an existing one and has a newer update, replace.
                         self._logger.debug("Floor action newer than existing one. {} vs {}. Will replace.".
@@ -284,10 +262,10 @@ class House(Chamber):
                     'id': floor_action.get('unique-id'), # The unique ID of this action.
                     'act-id': floor_action.get('act-id'), # Preserving the act-id. May need this? TBD.
                     'updated': datetime.strptime(floor_action.get('update-date-time'),
-                                                 "%Y%m%dT%H:%M").replace(tzinfo=self._dctz),
+                                                 "%Y%m%dT%H:%M").replace(tzinfo=Chamber._dctz),
                     # The action time lives in a child element action_time element. The for-search has an ISO8601 time.
                     'timestamp': datetime.strptime(floor_action.find('action_time').get('for-search'),
-                                               "%Y%m%dT%H:%M:%S").replace(tzinfo=self._dctz),
+                                               "%Y%m%dT%H:%M:%S").replace(tzinfo=Chamber._dctz),
                     'description': floor_action.find('action_description').text.strip()
                 }
 
@@ -298,16 +276,16 @@ class House(Chamber):
                     elif 'The House convened, starting a new legislative day.' in event['description']:
                         self._logger.info("Event {} - New Legislative Day.".format(floor_action.get("act-id")))
                         event['type'] = chambers.const.CONVENE
+                # Adjournments and Recesses get lumped together as an H61000
                 elif floor_action.get('act-id') == 'H61000':
                     self._logger.debug("Raw H61000 action: {}".format(floor_action))
                     # Adjourn
-                    if 'The House adjourned.' in event['description']:
+                    if ('The House adjourned' or 'The Speaker announced that the House do now adjourn'
+                            in event['description']):
                         self._logger.info("Event {} - Adjournment.".format(floor_action.get("act-id")))
                         event['type'] = chambers.const.ADJOURN
-                    elif 'The Speaker announced that the House do now adjourn' in event['description']:
-                        self._logger.info("Event {} - Adjournment".format(floor_action.get("act-id")))
-                        event['type'] = chambers.const.ADJOURN
-                    elif 'The Speaker announced that the House do now recess. The next meeting is scheduled for' in event['description']:
+                    elif ('The Speaker announced that the House do now recess. The next meeting is scheduled for'
+                          in event['description']):
                         self._logger.info("Event {} - Recess to time.".format(floor_action.get("act-id")))
                         event['type'] = chambers.const.RECESS_TIME
                     elif 'The Speaker announced that the House do now recess. The next meeting is subject to the call of the Chair.' == event['description']:

@@ -1,5 +1,5 @@
 name: "Chambers"
-version: "0.1.1-alpha4"
+version: "0.1.1-alpha6"
 slug: chambers
 stage: experimental
 description: "Congressional Chamber Status"
