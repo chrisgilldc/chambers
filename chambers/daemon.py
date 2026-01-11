@@ -366,10 +366,12 @@ class ChamberWatcher:
         Send the current House status to the Broker.
         :return:
         """
+
         self._pub_message(self._topics['house_convened'], self._house.convened)
-        self._pub_message(self._topics['house_adjourned_at'], self._house.adjourned_at)
-        self._pub_message(self._topics['house_convened_at'], self._house.convened_at)
-        self._pub_message(self._topics['house_convenes_at'], self._house.convenes_at)
+        # self._logger.debug("Will send House Adjourned At '{}' ({})".format(self._house.adjourned_at(), type(self._house.adjourned_at())))
+        self._pub_message(self._topics['house_adjourned_at'], self._house.adjourned_at())
+        self._pub_message(self._topics['house_convened_at'], self._house.convened_at())
+        self._pub_message(self._topics['house_convenes_at'], self._house.convenes_at())
         self._logger.info("House next update: {} ({})".format(self._house.next_update, type(self._house.next_update)))
         self._pub_message(self._topics['house_next_update'], self._house.next_update)
 
@@ -379,9 +381,9 @@ class ChamberWatcher:
         :return:
         """
         self._pub_message(self._topics['senate_convened'], self._senate.convened)
-        self._pub_message(self._topics['senate_adjourned_at'], self._senate.adjourned_at)
-        self._pub_message(self._topics['senate_convened_at'], self._senate.convened_at)
-        self._pub_message(self._topics['senate_convenes_at'], self._senate.convenes_at)
+        self._pub_message(self._topics['senate_adjourned_at'], self._senate.adjourned_at())
+        self._pub_message(self._topics['senate_convened_at'], self._senate.convened_at())
+        self._pub_message(self._topics['senate_convenes_at'], self._senate.convenes_at())
         self._logger.info(
             "Senate next update: {} ({})".format(self._senate.next_update, type(self._senate.next_update)))
         self._pub_message(self._topics['senate_next_update'], self._senate.next_update)
