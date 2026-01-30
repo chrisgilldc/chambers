@@ -238,12 +238,6 @@ class Senate(Chamber):
         if isinstance(adjournment, ET.Element):
             adjournment_events = self._parse_adjournment(adjournment.text, base_date, source_url)
             new_events.extend(adjournment_events)
-            # depart_type = chambers.const.ADJOURN
-            # depart_string = adjournment
-
-        # Check for convinfo
-        # convinfo = senate_tree.find("convinfo")
-
 
         added_events = 0
         for event in new_events:
@@ -262,10 +256,6 @@ class Senate(Chamber):
         # Assume we'll add.
         do_add = True
         del_list = []
-        # Decide if this action *should* be added. Prevents duplicates.
-        # if len(self._events) == 0:
-        #     do_add = True
-        # else:
         i = 0
         while i < len(self._events):
             if self._events[i]['timestamp'] == floor_action['timestamp']:
@@ -275,11 +265,14 @@ class Senate(Chamber):
                                        format(floor_action['timestamp']))
                     # Since we don't want to have two convenes, block it here.
                     do_add = False
+                elif self._events[i]['type'] == chambers.const.CONVENE and floor_action['type'] == chambers.const.ADJOURN:
+                    self._logger.debug("Senate convened and adjourned at exactly the same time, likely for a pro-forma "
+                                       "session. Adjusting the adjournment back 5s.")
+                    floor_action['timestamp'] = floor_action['timestamp'] + timedelta(seconds=5)
                 else:
                     self._logger.debug("Floor action already exists at timestamp {}. Will replace.".
                                        format(floor_action['timestamp']))
                     del_list.append(i)
-                    # do_add = True
                 break
             i += 1
 
@@ -384,18 +377,27 @@ class Senate(Chamber):
         recess_time = self._time_from_senate_string(recess_text, 'at')
         depart_at = datetime.combine(base_date, recess_time).replace(tzinfo=self._dctz)
 
+        convene_event = self._parse_next_convening(recess_text, base_date, source_url)
+
+        # This is a hack to handle the Senate's long adjournments.
+        #TODO: Rework 'Adjourned' to be 'NOT_CONVENED'
+        if convene_event is not None:
+            new_events.append(convene_event)
+            if convene_event['timestamp'] - datetime.now(timezone.utc) > timedelta(hours=12):
+                r_type = chambers.const.RECESS
+            else:
+                r_type = chambers.const.ADJOURN
+        else:
+            r_type = chambers.const.RECESS
+
         recess_event = {
             'timestamp': depart_at,
-            'type': chambers.const.RECESS,
+            'type': r_type,
             'description': recess_text,
             'source': 'XML',
             'source_url': source_url
         }
         new_events.append(recess_event)
-
-        convene_event = self._parse_next_convening(recess_text, base_date, source_url)
-        if convene_event is not None:
-            new_events.append(convene_event)
 
         return new_events
 

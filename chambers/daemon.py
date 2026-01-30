@@ -9,6 +9,7 @@ import json
 import os
 import paho.mqtt.client
 import pathlib
+from random import randint
 import signal
 import sys
 import time
@@ -129,18 +130,22 @@ class ChamberWatcher:
         :param properties:
         :return:
         """
-        self._logger.info("Connected to MQTT Broker with result code: {}".format(rc))
-        # Set connection status to connected.
-        self._mqtt_status = "connected"
-        # Send the online message.
-        self._send_online()
-        # Subscribe to the Home Assistant status topic.
-        self._mqtt_client.subscribe(f"homeassistant/status")
-        self._mqtt_client.message_callback_add("homeassistant/status", self._on_hachange)
-        # Attach the general message callback
-        # self._mqtt_client.on_message = self._on_message
-        # Run Home Assistant Discovery
-        self._ha_discovery()
+        if rc != "Success":
+            self._logger.error(f"MQTT Connection failed immediately. Cause: '{rc}'")
+            self._mqtt_status = "connfail"
+        else:
+            self._logger.info("Connected to MQTT Broker.")
+            # Set connection status to connected.
+            self._mqtt_status = "connected"
+            # Send the online message.
+            self._send_online()
+            # Subscribe to the Home Assistant status topic.
+            self._mqtt_client.subscribe(f"homeassistant/status")
+            self._mqtt_client.message_callback_add("homeassistant/status", self._on_hachange)
+            # Attach the general message callback
+            # self._mqtt_client.on_message = self._on_message
+            # Run Home Assistant Discovery
+            self._ha_discovery()
 
     def _on_disconnect(self, client, userdata, flags, rc, properties=None):
         """
@@ -151,6 +156,10 @@ class ChamberWatcher:
         :param rc: Disconnect reason code as received from the broker.
         :return:
         """
+        # A connection attempt that failed immediately will also trigger an disconnect callback, but we don't have
+        # anything to do for that, so immediately return and ignore it.
+        if self._mqtt_status == "connfail":
+            return
         if rc != 0:
             self._logger.warning("Unexpected disconnect with reason - '{}'".format(rc.getName()))
             self._mqtt_status = "disconnected"
@@ -175,13 +184,19 @@ class ChamberWatcher:
         if the_payload == 'offline':
             self._logger.warning("Home Assistant has gone offline!")
         elif the_payload == 'online':
-            self._logger.info("Home Assistant has gone online. Sending current status.")
+            discovery_wait = randint(5,15)
+            self._logger.info(f"Home Assistant has gone online. Waiting {discovery_wait}s before sending discovery.")
+            time.sleep(discovery_wait)
+            self._ha_discovery()
+            status_wait = randint(5,15)
+            self._logger.info(f"Discovery sent. Waiting {status_wait}s before sending status.")
+            time.sleep(status_wait)
             self._send_house()
             self._send_senate()
         else:
             self._logger.warning("MQTT message on home assistant topic has unknown payload '{}'".format(the_payload))
 
-    def _pub_message(self, topic, payload, send_json=False):
+    def _pub_message(self, topic, payload, send_json=False, retain=False):
         """
         Publish a message
 
@@ -190,20 +205,30 @@ class ChamberWatcher:
         # :param repeat: Repeat this even if the same payload has already been published.
         :param send_json: Convert to JSON before publication.
         :param send_json: bool
+        :param retain: Flag the MQTT message to be retained. Defaults to False.
+        :param retain: bool
         :return:
         """
 
-        # Convert to JSON if requested.
+        # Convert to JSON if requested, ignore all other conversion.
         if send_json:
             outbound_message = json.dumps(payload)
+        elif isinstance(payload, datetime):
+            # Convert datetimes to an ISO format string.
+            outbound_message = payload.isoformat()
+        elif isinstance(payload, str):
+            if len(payload) == 0:
+                # Convert zero-length strings to the value "None".
+                outbound_message = "None"
+        elif payload is None:
+            # Convert Python Nones to a literal none string.
+            outbound_message = "None"
         else:
+            # No conversion needed, send the payload as-is.
             outbound_message = payload
 
-        if isinstance(payload, datetime):
-            outbound_message = payload.isoformat()
-
         # Publish it!
-        self._mqtt_client.publish(topic, outbound_message)
+        self._mqtt_client.publish(topic, payload=outbound_message, retain=retain)
 
     @property
     def _topics(self):
@@ -409,7 +434,6 @@ class ChamberWatcher:
         :param frame: Frame
         :return:
         """
-        print("Caught signal {}".format(signalNumber))
         self.cleanup_and_exit(signalNumber)
 
     def _ha_discovery(self):
@@ -492,6 +516,20 @@ class ChamberWatcher:
             self._pub_message(
                 f"{self._ha_base}/sensor/{self._client_id}/{chamber}_convenes_at/config",
                 convenes_at_dict, send_json=True)
+
+            next_update_dict = {
+                'name': f"{chamber.capitalize()} Next Update",
+                'object_id': f"{chamber}_next_update",
+                'device': self._ha_device_info(),
+                'unique_id': f"{self._client_id}_{chamber}_next_update",
+                'state_topic': self._topics[f"{chamber}_next_update"],
+                'device_class': 'timestamp',
+                'availability': self._ha_availability()
+            }
+
+            self._pub_message(
+                f"{self._ha_base}/sensor/{self._client_id}/{chamber}_next_update/config",
+                next_update_dict, send_json=True)
 
     def _ha_availability(self):
         """
