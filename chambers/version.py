@@ -1,2 +1,2 @@
 """Chamber Version"""
-__version__ = "0.1.1-alpha7"
+__version__ = "0.1.1-alpha8"
