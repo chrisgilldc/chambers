@@ -220,6 +220,8 @@ class ChamberWatcher:
             if len(payload) == 0:
                 # Convert zero-length strings to the value "None".
                 outbound_message = "None"
+            else:
+                outbound_message = payload
         elif payload is None:
             # Convert Python Nones to a literal none string.
             outbound_message = "None"
